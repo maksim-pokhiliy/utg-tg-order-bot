@@ -25,6 +25,7 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
 | BD-6 | Node pinned via `engines` 24.x; npm stays    | RATIFIED |
 | BD-7 | Quality floor: tsc + vitest + prettier + CI  | RATIFIED |
 | BD-8 | Single env; smoke in the REAL operators chat | RATIFIED |
+| BD-9 | Unknown `locale` degrades to uk style, not 400 | RATIFIED |
 
 ---
 
@@ -111,3 +112,19 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
   боте» — one obvious test message per round beats maintaining a parallel environment
   for a volunteer project. Executors and tests still never touch the real API (BD-7
   mocks; the sacred list) — the smoke is a manual planner/owner act.
+
+### BD-9 — unknown `locale` degrades to uk formatting style instead of 400
+
+- **Status:** RATIFIED (planner ruling at the B1 plan gate, 2026-08-02 — a sanctioned
+  deviation from the B1 step prompt's "unknown locale → 400"; post-hoc owner veto open).
+- **Decision.** `locale` must be a string (the actual crash guard); `uk`/`en` are
+  honored; any other value formats with `uk` number style. Money is untouched —
+  `currency` stays authoritative per BD-2. The posture line: integrity-risk fields
+  (`total`, `currency`, cart shape) fail CLOSED with 400; style-only fields fail OPEN.
+- **Rationale.** Executor probe (Node 24, full ICU): `Intl.NumberFormat` throws only on
+  structurally invalid tags (`"not a tag!"`), not on unknown well-formed ones (`"de"`
+  formats fine) — the uk|en allow-list was never a crash guard, so rejecting bought no
+  safety. A third shop locale is an additive change that cannot fail the shop's own
+  typecheck (exactly how `currency` arrived in shop PR #11 while this repo stood
+  still); a 400 would silently lose 100% of that locale's orders, while degrading costs
+  thousands-separator cosmetics in a scenario that does not yet exist.

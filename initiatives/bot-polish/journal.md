@@ -29,3 +29,32 @@ Append-only. One entry per session/step.
 - B1 prompt written (`step-b1-relay-rewrite-prompt.md`) and committed; executor agent
   (Opus, `/feature`, root tree) spawning next. First combat run of `/step` +
   `/review-flow` outside the shop repo.
+
+## 2026-08-02 — B1 gate A: probes beat assumptions; seven rulings; BD-9
+
+- The executor's research fleet produced two probe-verified corrections to the
+  planner's own step prompt before any code: (1) a garbage `total` does NOT print
+  `₴NaN` — `Intl` coerces, and `""`/`[]`/`null`/`false` render as `0,00 ₴`, a
+  plausible FREE order the operator would pack (validation upgraded from hygiene to
+  integrity); (2) the uk|en locale allow-list was never a crash guard (`Intl` throws
+  only on structurally invalid tags), so the prompt's 400 bought outage risk, not
+  safety. Also surfaced: axios→fetch non-2xx trap (the top regression vector — a
+  straight port turns Telegram 400 into relay 200, cart cleared, order silently
+  gone), Vercel deployment protection blocks preview POSTs (BD-8's post-merge smoke
+  is the only smoke mechanically), `currencyDisplay: "narrowSymbol"` needed for the
+  ₴ criterion, bot-token leak via logged fetch errors, `ORDER_RELAY_SECRET=""` must
+  count as unset (a stray dashboard keystroke would 401 every live order),
+  surrogate-safe clamping, and diagnosable Reject/Send result types (field NAMES
+  loggable, values never).
+- Gate rulings (planner, under the delegated envelope): 4096-budget handling IN B1 —
+  clamp values generously and truncate the cart listing with an explicit "+N more"
+  marker rather than ever rejecting a validated order (the charter's
+  no-formatting-500 criterion covers oversized messages); `narrowSymbol` yes; empty
+  `cart` → 400 and required contact fields mirror the shop's own `REQUIRED_FIELDS`
+  (`additional` may be empty; cart `quantity` must be a positive integer); strict
+  plain-decimal `total` stays (the probe table becomes the test table); tooling
+  majors mirror the shop (typescript ^5, vitest ^3.2); locale degrades — BD-9, the
+  one sanctioned deviation from the committed step prompt. The preview-bypass
+  question is the owner's and non-blocking (parked on the board).
+- Process note for the /feature retro: two research agents raced on one scratch
+  artifact (one overwrite, recovered) — artifact ownership per agent next time.

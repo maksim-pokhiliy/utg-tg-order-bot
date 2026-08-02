@@ -1,6 +1,6 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-02 (initiative opened; B1 prompt committed, executor round opening)
+**Updated:** 2026-08-02 (B1 gate A answered — BD-9 ruled, 4096-degrade in scope; executor implementing toward the PR)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -14,10 +14,14 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 ## Next action
 
-Continue the `/step` loop for B1: triage the executor's plan-gate report (phase 3), then
-independent review on the PR (phase 4, `/review-flow` deep), fix rounds to the original
-executor, planner verification, owner merge, prod deploy verify + TEST-labeled smoke in
-the real operators' chat (BD-8), docs promotion here AND in the shop ledger.
+B1 gate A is answered (all seven rulings in the journal; BD-9 is the sanctioned locale
+deviation) — the executor implements toward the PR. Then: independent review (phase 4,
+`/review-flow` deep), fix rounds to the original executor, planner verification, owner
+merge, prod deploy verify + TEST-labeled smoke in the real operators' chat (BD-8), docs
+promotion here AND in the shop ledger. PARKED FOR THE OWNER (non-blocking, decide by
+merge time): Vercel "Protection Bypass for Automation" toggle — enables a functional
+preview check (error-path POSTs only, nothing reaches the chat) before merging; the
+alternative is merge on build-green + immediate smoke + revert-ready.
 
 ## Open decisions awaiting ratification
 
