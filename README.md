@@ -72,7 +72,11 @@ CI runs one battery on every pull request and every push to `master`: install �
 
 ## Deployment
 
-Vercel project `telegram-bot-server`, auto-deploying `master`. `vercel.json` carries only the `/place_order` → `/api/place_order` rewrite; everything else is zero-config. This relay is live production for real volunteer orders — a broken deploy silently breaks checkout on the storefront.
+Vercel project `telegram-bot-server`, auto-deploying `master`. `vercel.json` carries two things: the `/place_order` → `/api/place_order` rewrite, and a `maxDuration` set above the outgoing request timeout so the relay's own timeout is the one that fires. Everything else is zero-config.
+
+`.vercelignore` decides what reaches the deployment, and it is an **allowlist**: everything at the root is excluded, and only `api/`, `src/` and the build manifests are added back. **If you add a source directory the function imports from, add it there too** — a missing entry still typechecks, still passes the load smoke and still builds, and then the deployed lambda dies on its first request. `tests/vercelignore.test.ts` derives the directories the compiled module graph actually reaches and fails CI when one of them is not shipped, so that is caught before production rather than by it.
+
+This relay is live production for real volunteer orders — a broken deploy silently breaks checkout on the storefront.
 
 ## License
 
