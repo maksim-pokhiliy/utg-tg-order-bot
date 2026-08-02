@@ -1,17 +1,25 @@
 {
   "name": "telegram-bot-server",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Telegram order relay for the Ukrainian Tactical Gear shop: accepts the checkout payload and delivers one formatted order message to the operators' chat.",
+  "license": "MIT",
+  "author": "Maksim Pokhiliy",
+  "engines": {
+    "node": "24.x"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "axios": "^1.7.3",
-    "body-parser": "^1.20.2",
-    "express": "^4.19.2"
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "prettier": "^3.3.3",
+    "typescript": "^5",
+    "vitest": "^3.2"
   }
 }

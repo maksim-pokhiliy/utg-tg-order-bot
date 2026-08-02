@@ -1,0 +1,6 @@
+node_modules
+package-lock.json
+.feature-dev
+.vercel
+initiatives
+CLAUDE.md
