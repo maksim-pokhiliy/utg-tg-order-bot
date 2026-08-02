@@ -1,6 +1,6 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-02 (B1 review: REQUEST CHANGES — RF-1 deploy-blocker confirmed, ESM specifiers would keep the function from loading in prod; 18 findings routed, fix round dispatched to the original executor)
+**Updated:** 2026-08-02 (B1 re-review: MERGE-READY bar RF-19; micro-fix round dispatched, then the owner's merge gate)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -14,15 +14,18 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 ## Next action
 
-B1 fix round is with the original executor (all 18 review findings routed fix-now
-except the refuted length-rejection claim and the untestable-timing aspect of RF-14 —
-converted to a source-pin test; routing detail in the journal). Then: planner
-verification (phase 6 — re-run the battery, spot-verify RF-1/RF-2/RF-4 fixes at
-source, check the PR file list), owner merge, prod deploy verify + TEST-labeled smoke
-in the real operators' chat (BD-8), docs promotion here AND in the shop ledger. PARKED FOR THE OWNER (non-blocking, decide by
-merge time): Vercel "Protection Bypass for Automation" toggle — enables a functional
-preview check (error-path POSTs only, nothing reaches the chat) before merging; the
-alternative is merge on build-green + immediate smoke + revert-ready.
+The B1 micro-fix round is with the original executor (RF-19 blocker + nine routed
+items; the rest deferred as BDEF-2/BDEF-3 — routing in the journal). Planner
+verification of the previous round already ran and passed (battery, invariants, PR
+file list clean). Then: the OWNER's merge gate, prod deploy verify + TEST-labeled
+smoke in the real operators' chat (BD-8), docs promotion here AND in the shop ledger,
+then B2.
+
+PARKED FOR THE OWNER (non-blocking, decide at merge time): the Vercel "Protection
+Bypass for Automation" toggle on project `telegram-bot-server` — it would allow a
+functional preview check (error-path POSTs only, nothing reaches the chat) before
+merging; the alternative is merging on build-green + CI load-smoke + immediate smoke
+with a revert ready (`dpl_5z6byFckuZ7gRF1ENFRWYMJctCxk` is the rollback candidate).
 
 ## Open decisions awaiting ratification
 
@@ -30,7 +33,10 @@ alternative is merge on build-green + immediate smoke + revert-ready.
 
 ## Live carry-forwards
 
-BDEF-1 (unauthenticated relay until B2 enablement — SCHEDULED to B2).
+BDEF-1 (unauthenticated relay until B2 enablement — SCHEDULED to B2); BDEF-2 (module
+hygiene batch from the re-review — next bot window); BDEF-3 (no idempotency: an
+ambiguous upstream outcome can duplicate an order on a buyer retry — needs a contract
+change, its own step).
 
 ## Gotchas a resuming session must know
 

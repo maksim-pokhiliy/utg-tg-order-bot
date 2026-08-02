@@ -105,3 +105,58 @@ Append-only. One entry per session/step.
   review-flow. And the breaker's first mutant run reported 33/33 SURVIVED due to its
   own ANSI-grep harness bug — it caught and fixed itself, but "mutant harness must
   assert APPLIED/NO-OP" belongs in the skill text.
+
+## 2026-08-02 — B1 re-review: MERGE-READY bar one blocker; a planner ruling refuted before it shipped
+
+- Re-review (standard + security lens) of the fix-round delta: all 18 prior findings
+  land (13 HOLDS / 5 PARTIAL / 0 MISSING, no regressions introduced by the fixes),
+  battery and CI green, and the platform settled two questions the reviewers could
+  only infer — the broken `.vercelignore` form deployed ERROR while the fixed one
+  deployed READY with one lambda, and RF-1's severity stands (a real `vercel build`
+  emits per-file, no bundler). 22 new findings, no caps applied.
+- **BD-10 withdrawn before ratification.** The breaker measured "under-budget"
+  messages at 4285–6681 UTF-16 units and inferred Telegram counts UTF-16; the planner
+  ruled to switch the budget unit on dominant-strategy grounds (safe under both
+  readings) — and a refuter killed the premise with verbatim source: TDLib
+  `MessageContent.cpp:4757` guards the bot path with `utf8_length` (CODE POINTS);
+  `utf8_utf16_length`, the one carrying the astral adjustment, serves entity offsets
+  only. The two were conflated. Code points stay; the budget is airtight by
+  construction (max 4092 raw against 4096). Second round running that the 4096 limit
+  bred a converged-on wrong premise caught only by refutation — convergence between
+  finder lenses and a breaker is not evidence.
+- Blocking: **RF-19** — the RF-9 `.vercelignore` fix created a deploy-time allowlist
+  narrower than the compile-time module graph, two hand-maintained sources of truth
+  with nothing tying them. A new `lib/*.ts`, imported correctly, passes typecheck,
+  smoke, prettier and 85/85 while `@vercel/nft` merely WARNS and emits a lambda that
+  cannot resolve it — RF-1 reachable through a door this diff opened. Fix routed:
+  derive the shipped top-level dirs from the smoke emit and assert each ships.
+- Also routed fix-now: the handler try/catch is deleteable with 85/85 green, and the
+  test that appears to cover it never reaches the boundary (RF-20); four budget tests
+  assert the bound in UTF-16 while production budgets code points (RF-21); the
+  constant-time pin is satisfied by the import line alone (RF-24); no distinct log
+  event for "HTTP 200, verdict unreadable" — the one state where the message probably
+  WAS delivered while the shop is told it failed, so a buyer retry duplicates the
+  order (RF-22); newline structure-forgery in single-line fields (RF-25 — collapse
+  where newlines are never legitimate; `additional` keeps its line breaks after the
+  refuter proved contact inputs strip newlines browser-side and `title` has zero buyer
+  influence); the `.env.*` glob (RF-23); and from the breaker's own report an
+  unbounded `total` still printing `∞ ₴`, `quantity: 1e21` rendering `1e+21` as the
+  single unescaped interpolation, an accepted empty `productUrl`, and the untested
+  `AbortError` arm. README/PR-body truth fixes (RF-38/RF-39): the PR prose says six
+  mutation proofs above an eight-row table and misreports one mutation's failure
+  count — the claims-audit stage catching the change's own evidence is exactly why it
+  exists.
+- Deferred: BDEF-2 (module hygiene batch — dead/write-only surface, TDZ hazard,
+  untyped env name, deployed tsconfig including test paths, smoke leftovers) and
+  BDEF-3 (no idempotency — an ambiguous upstream outcome can duplicate an order on a
+  retry; real dedup needs an idempotency key in the payload, i.e. a shop+bot contract
+  change, so it gets its own step rather than riding B1).
+- Breaker coverage: the breaker DID run (39 mutants, 31 killed, 4 genuine gaps, 14
+  findings) and its report reached the PLANNER directly, but its reply to the
+  orchestrator failed to route — it addressed the peer by agent TYPE instead of by
+  address — so the re-review honestly marks its own breaker section as a gap. No
+  re-run ordered: the content exists and the planner folded it into the fix round.
+  Third tooling lesson of this step, one root cause: agents do not know the harness
+  wakes them, so they poll, wait, or misaddress. To codify in review-flow: never spawn
+  wait/poll shells, address peers by address, and report from what you have when a
+  peer goes silent.
