@@ -1,40 +1,57 @@
+import { readEnv } from "./env.js";
+
 const TELEGRAM_API_ORIGIN = "https://api.telegram.org";
 const PARSE_MODE = "HTML";
+const REQUEST_TIMEOUT_MS = 10_000;
 
 export type SendFailure =
-  "config_missing" | "upstream_rejected" | "network_error";
+  | "config_missing"
+  | "upstream_rejected"
+  | "upstream_not_ok"
+  | "timeout"
+  | "network_error";
 
 export type SendResult = { ok: true } | { ok: false; reason: SendFailure };
+
+interface TelegramVerdict {
+  isAccepted: boolean;
+  errorCode: number | undefined;
+}
 
 const logEvent = (event: string, detail: Record<string, unknown>): void => {
   console.error(JSON.stringify({ event, ...detail }));
 };
 
-const readDescription = async (response: Response): Promise<string> => {
+export const createTimeoutSignal = (ms: number): AbortSignal =>
+  AbortSignal.timeout(ms);
+
+const readVerdict = async (response: Response): Promise<TelegramVerdict> => {
   try {
     const body: unknown = await response.json();
 
-    if (typeof body === "object" && body !== null && "description" in body) {
-      const { description } = body;
-
-      return typeof description === "string" ? description : "";
+    if (typeof body !== "object" || body === null) {
+      return { isAccepted: false, errorCode: undefined };
     }
 
-    return "";
+    const isAccepted = "ok" in body && body.ok === true;
+    const rawCode = "error_code" in body ? body.error_code : undefined;
+
+    return {
+      isAccepted,
+      errorCode: typeof rawCode === "number" ? rawCode : undefined,
+    };
   } catch {
-    return "";
+    return { isAccepted: false, errorCode: undefined };
   }
 };
 
-const readSetting = (name: string): string | undefined => {
-  const value = process.env[name];
-
-  return value === undefined || value.trim() === "" ? undefined : value;
-};
+const isTimeout = (error: unknown): boolean =>
+  error instanceof Error &&
+  (error.name === "TimeoutError" || error.name === "AbortError");
 
 export const sendOrderMessage = async (text: string): Promise<SendResult> => {
-  const token = readSetting("TELEGRAM_BOT_TOKEN");
-  const chatId = readSetting("TELEGRAM_CHAT_ID");
+  const token = readEnv("TELEGRAM_BOT_TOKEN");
+  const chatId = readEnv("TELEGRAM_CHAT_ID");
 
   if (token === undefined || chatId === undefined) {
     logEvent("telegram_config_missing", {
@@ -56,20 +73,38 @@ export const sendOrderMessage = async (text: string): Promise<SendResult> => {
           text,
           parse_mode: PARSE_MODE,
         }),
+        signal: createTimeoutSignal(REQUEST_TIMEOUT_MS),
       }
     );
+
+    const verdict = await readVerdict(response);
 
     if (!response.ok) {
       logEvent("telegram_send_rejected", {
         status: response.status,
-        description: await readDescription(response),
+        errorCode: verdict.errorCode,
       });
 
       return { ok: false, reason: "upstream_rejected" };
     }
 
+    if (!verdict.isAccepted) {
+      logEvent("telegram_send_not_ok", {
+        status: response.status,
+        errorCode: verdict.errorCode,
+      });
+
+      return { ok: false, reason: "upstream_not_ok" };
+    }
+
     return { ok: true };
   } catch (error) {
+    if (isTimeout(error)) {
+      logEvent("telegram_timeout", { timeoutMs: REQUEST_TIMEOUT_MS });
+
+      return { ok: false, reason: "timeout" };
+    }
+
     logEvent("telegram_network_error", {
       errorName: error instanceof Error ? error.name : "unknown",
     });

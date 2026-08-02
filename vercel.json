@@ -5,5 +5,10 @@
       "source": "/place_order",
       "destination": "/api/place_order"
     }
-  ]
+  ],
+  "functions": {
+    "api/place_order.ts": {
+      "maxDuration": 15
+    }
+  }
 }
