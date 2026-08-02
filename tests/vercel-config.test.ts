@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
+import { REQUEST_TIMEOUT_MS } from "../src/telegram.js";
+
 const configPath = fileURLToPath(new URL("../vercel.json", import.meta.url));
 const config: unknown = JSON.parse(readFileSync(configPath, "utf8"));
 
@@ -32,8 +34,11 @@ describe("vercel.json", () => {
   });
 
   it("gives the function more time than the upstream call is allowed", () => {
-    expect(asRecord(config)["functions"]).toEqual({
-      "api/place_order.ts": { maxDuration: 15 },
-    });
+    const functions = asRecord(asRecord(config)["functions"]);
+    const entry = asRecord(functions["api/place_order.ts"]);
+    const maxDuration = entry["maxDuration"];
+
+    expect(typeof maxDuration).toBe("number");
+    expect(Number(maxDuration) * 1000).toBeGreaterThan(REQUEST_TIMEOUT_MS);
   });
 });

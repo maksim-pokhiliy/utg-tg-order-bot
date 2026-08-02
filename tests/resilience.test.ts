@@ -190,33 +190,116 @@ describe("the handler boundary", () => {
     await expect(response.json()).resolves.toEqual({ status: "success" });
   });
 
-  it("answers the frozen opaque 500 when something unexpected throws", async () => {
+  it("answers the frozen opaque 500 when a module the handler calls throws", async () => {
     const logs = captureConsoleError();
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => {
+    stubTelegram();
+    vi.resetModules();
+    vi.doMock("../src/message.js", () => ({
+      buildOrderMessage: (): string => {
         throw new RangeError("simulated invariant break");
-      })
-    );
+      },
+    }));
 
-    const response = await POST(new StubRequest(buildOrder()));
+    try {
+      const { POST: guarded } = await import("../api/place_order.js");
 
-    expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ status: "error" });
-    expect(joinLoggedLines(logs)).not.toContain("simulated invariant break");
+      const response = await guarded(new StubRequest(buildOrder()));
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({ status: "error" });
+
+      const logged = joinLoggedLines(logs);
+
+      expect(logged).toContain("relay_unhandled_error");
+      expect(logged).toContain("RangeError");
+      expect(logged).not.toContain("simulated invariant break");
+    } finally {
+      vi.doUnmock("../src/message.js");
+      vi.resetModules();
+    }
   });
 });
 
 describe("the auth comparison", () => {
-  it("is still constant-time by construction", () => {
+  it("still compares through timingSafeEqual, not just imports it", () => {
     const source = readFileSync(
       fileURLToPath(new URL("../src/auth.ts", import.meta.url)),
       "utf8"
     );
 
-    expect(source).toContain("timingSafeEqual");
-    expect(source).not.toMatch(/presented\s*===\s*secret/);
-    expect(source).not.toMatch(/secret\s*===\s*presented/);
+    expect(source).toMatch(/timingSafeEqual\(\s*digest\(/u);
+    expect(source).not.toMatch(/presented\s*===\s*secret/u);
+    expect(source).not.toMatch(/secret\s*===\s*presented/u);
+    expect(source).not.toMatch(/presented\s*!==\s*secret/u);
+    expect(source).not.toMatch(/secret\s*!==\s*presented/u);
+  });
+
+  it("tolerates a header an exotic proxy padded", async () => {
+    vi.stubEnv("ORDER_RELAY_SECRET", TRIMMED);
+    stubTelegram();
+
+    const response = await POST(
+      new StubRequest(buildOrder(), { "x-relay-secret": `  ${TRIMMED}  ` })
+    );
+
+    expect(response.status).toBe(200);
+  });
+});
+
+describe("an acknowledgement the relay cannot read", () => {
+  it("is reported as its own state, not as a plain rejection", async () => {
+    const logs = captureConsoleError();
+
+    stubTelegram(
+      async () => new Response("<html>gateway</html>", { status: 200 })
+    );
+
+    const response = await POST(new StubRequest(buildOrder()));
+
+    expect(response.status).toBe(500);
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("telegram_ack_unreadable");
+    expect(logged).not.toContain("telegram_send_not_ok");
+  });
+
+  it("is classified as a timeout when the body read is what timed out", async () => {
+    const logs = captureConsoleError();
+
+    stubTelegram(
+      async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.reject(
+              new DOMException("The operation timed out.", "TimeoutError")
+            ),
+        }) as unknown as Response
+    );
+
+    const response = await POST(new StubRequest(buildOrder()));
+
+    expect(response.status).toBe(500);
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("telegram_timeout");
+    expect(logged).not.toContain("telegram_ack_unreadable");
+  });
+
+  it("classifies an aborted call as a timeout too", async () => {
+    const logs = captureConsoleError();
+
+    stubTelegram(async () => {
+      throw new DOMException("This operation was aborted", "AbortError");
+    });
+
+    const response = await POST(new StubRequest(buildOrder()));
+
+    expect(response.status).toBe(500);
+    expect(joinLoggedLines(logs)).toContain("telegram_timeout");
   });
 });

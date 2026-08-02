@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOrderMessage,
   clampEscaped,
+  countCodePoints,
   escapeHtml,
   formatTotal,
 } from "../src/message.js";
@@ -173,6 +174,34 @@ describe("buildOrderMessage", () => {
     expect(message).not.toMatch(/\+\d+ more positions/);
   });
 
+  it("cannot be tricked into forging a second product block", () => {
+    const forgery =
+      "Petrenko\n🏷️ <b>Title:</b> Free rifle\n🔢 <b>Quantity:</b> 99";
+    const message = buildOrderMessage(parse({ last_name: forgery }));
+
+    expect(message.split("🏷️ <b>Title:</b>")).toHaveLength(2);
+    expect(message).not.toContain("🔢 <b>Quantity:</b> 99");
+    expect(message).toContain("🧔 <b>Last Name:</b> Petrenko ");
+  });
+
+  it("keeps a newline-bearing field on its own single line", () => {
+    const clean = buildOrderMessage(parse({ city: "Kyiv" }));
+    const forged = buildOrderMessage(
+      parse({ city: "Kyiv\r\n💲 <b>Total:</b> 0,00 ₴" })
+    );
+
+    expect(forged.split("\n")).toHaveLength(clean.split("\n").length);
+    expect(forged).toContain("🌍 <b>City:</b> Kyiv 💲");
+    expect(forged.split("💲 <b>Total:</b>")).toHaveLength(2);
+  });
+
+  it("leaves a legitimate multi-line note alone", () => {
+    const note = "Line one\nLine two\nLine three";
+    const message = buildOrderMessage(parse({ additional: note }));
+
+    expect(message).toContain(note);
+  });
+
   it("escapes hostile field content instead of relaying markup", () => {
     const message = buildOrderMessage(
       parse({ first_name: "<b>Bobby</b> & co" })
@@ -192,7 +221,7 @@ describe("buildOrderMessage", () => {
     const message = buildOrderMessage(parse({ additional: "x".repeat(5000) }));
 
     expect(message).toContain("…");
-    expect(message.length).toBeLessThanOrEqual(4096);
+    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
   });
 
   it("truncates the cart listing and reports how many positions were dropped", () => {
@@ -202,7 +231,7 @@ describe("buildOrderMessage", () => {
 
     const message = buildOrderMessage(parse({ cart }));
 
-    expect(message.length).toBeLessThanOrEqual(4096);
+    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
     expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/);
     expect(message).toContain("👤 <b>First Name:</b> Олександр");
     expect(message).toContain("💲 <b>Total:</b>");
@@ -219,11 +248,11 @@ describe("buildOrderMessage", () => {
         city: "ф".repeat(9000),
         address: "ф".repeat(9000),
         additional: "ф".repeat(9000),
-        total: "9".repeat(300),
+        total: "9".repeat(20),
       })
     );
 
-    expect(message.length).toBeLessThanOrEqual(4096);
+    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
     expect(message).toContain("🛒 <b>Products:</b>");
     expect(message).toContain("🏷️ <b>Title:</b>");
   });
@@ -235,7 +264,7 @@ describe("buildOrderMessage", () => {
 
     const message = buildOrderMessage(parse({ cart }));
 
-    expect(message.length).toBeLessThanOrEqual(4096);
+    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
     expect(message).toContain("Товар 24");
   });
 });

@@ -10,6 +10,8 @@ const REQUIRED_TEXT_KEYS = [
 
 const TOTAL_PATTERN = /^\d+(\.\d+)?$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+const MAX_TOTAL_LENGTH = 20;
+const MAX_QUANTITY = 100_000;
 
 type RequiredTextKey = (typeof REQUIRED_TEXT_KEYS)[number];
 
@@ -54,7 +56,9 @@ const isCurrencyCode = (value: unknown): value is string =>
   typeof value === "string" && CURRENCY_PATTERN.test(value);
 
 const isPlainDecimal = (value: unknown): value is PlainDecimal =>
-  typeof value === "string" && TOTAL_PATTERN.test(value);
+  typeof value === "string" &&
+  value.length <= MAX_TOTAL_LENGTH &&
+  TOTAL_PATTERN.test(value);
 
 const readRequiredText = (
   source: Record<string, unknown>,
@@ -110,7 +114,7 @@ const parseCartItem = (input: unknown): OrderCartItem | undefined => {
     return undefined;
   }
 
-  if (typeof productUrl !== "string") {
+  if (typeof productUrl !== "string" || productUrl.trim() === "") {
     return undefined;
   }
 
@@ -118,7 +122,11 @@ const parseCartItem = (input: unknown): OrderCartItem | undefined => {
     return undefined;
   }
 
-  return quantity >= 1 ? { title, quantity, productUrl } : undefined;
+  if (quantity < 1 || quantity > MAX_QUANTITY) {
+    return undefined;
+  }
+
+  return { title, quantity, productUrl };
 };
 
 const parseCart = (input: unknown): readonly OrderCartItem[] | RejectReason => {

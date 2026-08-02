@@ -129,6 +129,35 @@ describe("parseOrderPayload", () => {
     }
   });
 
+  it("rejects a total with more digits than money can have", () => {
+    expectReject({ total: "9".repeat(400) }, "total_not_plain_decimal");
+    expectReject({ total: "9".repeat(21) }, "total_not_plain_decimal");
+  });
+
+  it("accepts a total right at the digit bound", () => {
+    expect(parseOrderPayload(buildOrder({ total: "9".repeat(20) })).ok).toBe(
+      true
+    );
+  });
+
+  it("rejects a quantity beyond any sane order", () => {
+    for (const quantity of [1e21, 100_001, Number.MAX_SAFE_INTEGER]) {
+      expectReject(
+        { cart: [buildCartItem({ quantity })] },
+        "cart_item_malformed"
+      );
+    }
+  });
+
+  it("rejects an empty product url", () => {
+    for (const productUrl of ["", "   "]) {
+      expectReject(
+        { cart: [buildCartItem({ productUrl })] },
+        "cart_item_malformed"
+      );
+    }
+  });
+
   it("rejects a malformed currency code", () => {
     for (const currency of ["UAHX", "ua", "U1H", "", 42]) {
       expectReject({ currency }, "currency_malformed");

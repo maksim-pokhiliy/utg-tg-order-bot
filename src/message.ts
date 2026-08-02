@@ -4,6 +4,7 @@ const MAX_TELEGRAM_TEXT_LENGTH = 4096;
 const CONTACT_FIELD_LIMIT = 200;
 const ADDITIONAL_LIMIT = 600;
 const TOTAL_LIMIT = 60;
+const QUANTITY_LIMIT = 12;
 const CART_TITLE_LIMIT = 200;
 const CART_URL_LIMIT = 400;
 const MAX_ESCAPE_EXPANSION = 5;
@@ -67,6 +68,12 @@ const field = (value: string, limit: number): string => {
   return clampEscaped(escapeHtml(bounded.toWellFormed()), limit);
 };
 
+export const collapseNewlines = (value: string): string =>
+  value.replaceAll(/\r?\n/gu, " ");
+
+const singleLineField = (value: string, limit: number): string =>
+  field(collapseNewlines(value), limit);
+
 const resolveStyleLocale = (locale: string): string =>
   STYLE_LOCALES.has(locale) ? locale : DEFAULT_LOCALE;
 
@@ -88,13 +95,13 @@ export const formatTotal = (
 
 const buildHeader = (payload: OrderPayload): string =>
   [
-    `👤 <b>First Name:</b> ${field(payload.first_name, CONTACT_FIELD_LIMIT)}`,
-    `🧔 <b>Last Name:</b> ${field(payload.last_name, CONTACT_FIELD_LIMIT)}`,
-    `📞 <b>Telephone:</b> ${field(payload.telephone, CONTACT_FIELD_LIMIT)}`,
-    `🌍 <b>Country:</b> ${field(payload.country, CONTACT_FIELD_LIMIT)}`,
-    `🌍 <b>State:</b> ${field(payload.state, CONTACT_FIELD_LIMIT)}`,
-    `🌍 <b>City:</b> ${field(payload.city, CONTACT_FIELD_LIMIT)}`,
-    `🏠 <b>Address:</b> ${field(payload.address, CONTACT_FIELD_LIMIT)}`,
+    `👤 <b>First Name:</b> ${singleLineField(payload.first_name, CONTACT_FIELD_LIMIT)}`,
+    `🧔 <b>Last Name:</b> ${singleLineField(payload.last_name, CONTACT_FIELD_LIMIT)}`,
+    `📞 <b>Telephone:</b> ${singleLineField(payload.telephone, CONTACT_FIELD_LIMIT)}`,
+    `🌍 <b>Country:</b> ${singleLineField(payload.country, CONTACT_FIELD_LIMIT)}`,
+    `🌍 <b>State:</b> ${singleLineField(payload.state, CONTACT_FIELD_LIMIT)}`,
+    `🌍 <b>City:</b> ${singleLineField(payload.city, CONTACT_FIELD_LIMIT)}`,
+    `🏠 <b>Address:</b> ${singleLineField(payload.address, CONTACT_FIELD_LIMIT)}`,
     `💲 <b>Total:</b> ${field(
       formatTotal(payload.total, payload.locale, payload.currency),
       TOTAL_LIMIT
@@ -108,9 +115,9 @@ const buildHeader = (payload: OrderPayload): string =>
 
 const buildItem = (item: OrderCartItem): string =>
   [
-    `🏷️ <b>Title:</b> ${field(item.title, CART_TITLE_LIMIT)}`,
-    `🔢 <b>Quantity:</b> ${String(item.quantity)}`,
-    `🔗 <b>Product URL:</b> ${field(item.productUrl, CART_URL_LIMIT)}`,
+    `🏷️ <b>Title:</b> ${singleLineField(item.title, CART_TITLE_LIMIT)}`,
+    `🔢 <b>Quantity:</b> ${field(String(item.quantity), QUANTITY_LIMIT)}`,
+    `🔗 <b>Product URL:</b> ${singleLineField(item.productUrl, CART_URL_LIMIT)}`,
   ].join("\n");
 
 export const buildOrderMessage = (payload: OrderPayload): string => {

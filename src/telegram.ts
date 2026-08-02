@@ -2,12 +2,13 @@ import { readEnv } from "./env.js";
 
 const TELEGRAM_API_ORIGIN = "https://api.telegram.org";
 const PARSE_MODE = "HTML";
-const REQUEST_TIMEOUT_MS = 10_000;
+export const REQUEST_TIMEOUT_MS = 10_000;
 
 export type SendFailure =
   | "config_missing"
   | "upstream_rejected"
   | "upstream_not_ok"
+  | "ack_unreadable"
   | "timeout"
   | "network_error";
 
@@ -15,6 +16,7 @@ export type SendResult = { ok: true } | { ok: false; reason: SendFailure };
 
 interface TelegramVerdict {
   isAccepted: boolean;
+  isReadable: boolean;
   errorCode: number | undefined;
 }
 
@@ -25,12 +27,16 @@ const logEvent = (event: string, detail: Record<string, unknown>): void => {
 export const createTimeoutSignal = (ms: number): AbortSignal =>
   AbortSignal.timeout(ms);
 
+const isTimeout = (error: unknown): boolean =>
+  error instanceof Error &&
+  (error.name === "TimeoutError" || error.name === "AbortError");
+
 const readVerdict = async (response: Response): Promise<TelegramVerdict> => {
   try {
     const body: unknown = await response.json();
 
     if (typeof body !== "object" || body === null) {
-      return { isAccepted: false, errorCode: undefined };
+      return { isAccepted: false, isReadable: false, errorCode: undefined };
     }
 
     const isAccepted = "ok" in body && body.ok === true;
@@ -38,16 +44,17 @@ const readVerdict = async (response: Response): Promise<TelegramVerdict> => {
 
     return {
       isAccepted,
+      isReadable: true,
       errorCode: typeof rawCode === "number" ? rawCode : undefined,
     };
-  } catch {
-    return { isAccepted: false, errorCode: undefined };
+  } catch (error) {
+    if (isTimeout(error)) {
+      throw error;
+    }
+
+    return { isAccepted: false, isReadable: false, errorCode: undefined };
   }
 };
-
-const isTimeout = (error: unknown): boolean =>
-  error instanceof Error &&
-  (error.name === "TimeoutError" || error.name === "AbortError");
 
 export const sendOrderMessage = async (text: string): Promise<SendResult> => {
   const token = readEnv("TELEGRAM_BOT_TOKEN");
@@ -86,6 +93,12 @@ export const sendOrderMessage = async (text: string): Promise<SendResult> => {
       });
 
       return { ok: false, reason: "upstream_rejected" };
+    }
+
+    if (!verdict.isReadable) {
+      logEvent("telegram_ack_unreadable", { status: response.status });
+
+      return { ok: false, reason: "ack_unreadable" };
     }
 
     if (!verdict.isAccepted) {
