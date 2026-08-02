@@ -31,9 +31,17 @@ Other `cart[]` keys the shop sends (`id`, `price`, `image`) are accepted and ign
 | `ORDER_RELAY_SECRET` configured and the header is missing or wrong | `401`  | `{"status":"error"}`   |
 | bot not configured, or Telegram refused / was unreachable          | `500`  | `{"status":"error"}`   |
 
-Bodies are constant: they never echo the request or upstream error text. Failures are logged server-side as one structured JSON line carrying the event, the upstream status and Telegram's description — never a payload field, because names, phones and addresses are personal data, and never the bot token.
+A `200` from Telegram is not automatically a success: the Bot API answers `200` with `{"ok": false}` when the bot is blocked or the chat is gone, and the relay treats that as a failure rather than telling the shop the order arrived. The outgoing call also carries a 10-second timeout, so a hung upstream cannot pin the invocation and leave the buyer on a spinner.
+
+Bodies are constant: they never echo the request or upstream error text. Failures are logged server-side as one structured JSON line carrying the event, the upstream HTTP status and Telegram's numeric `error_code` — **never the `description`**, because Bot API parse errors quote fragments of the outgoing message, which is buyer data. No payload field and no bot token is ever logged.
 
 Both `/place_order` and `/api/place_order` serve the function.
+
+## Message shape and limits
+
+The message keeps the field order, emoji and bold labels the operators already know, rendered in HTML parse mode with every interpolated value escaped.
+
+Telegram caps a message at 4096 characters, and exceeding it means the message is rejected and the order is lost. Rather than reject the order or let that happen, the relay bounds the message: every field is clamped to a generous limit and marked with `…` where it was cut, and if the message would still be too long the **cart listing** is truncated with a trailing `… <b>+N more positions</b>` marker. Contact details and the total are never dropped — an operator who sees that marker still has everything needed to phone the buyer and confirm the remaining positions.
 
 ## Environment
 
@@ -50,14 +58,17 @@ There is deliberately no local `.env` and no `.env.example` holding real values 
 ```bash
 npm install
 npm run typecheck     # tsc --noEmit
-npm test              # vitest, fetch is always mocked
+npm test              # vitest; the Telegram API is stubbed wherever it is called
+npm run smoke         # compile per-file and load the entrypoint under real ESM rules
 npm run format        # prettier --write .
 npm run format:check  # what CI runs
 ```
 
-Node is pinned to `24.x` through `engines.node` — the one pin Vercel, npm and CI all read. Tests never reach the network: the Telegram API is stubbed in every case, and nothing in this repository may POST to the deployed relay.
+Node is pinned to `24.x` through `engines.node`: Vercel reads it for the runtime and CI reads it via `node-version-file`, so there is one pin rather than three (npm only warns about it unless `engine-strict` is set). Tests never reach the network — the Telegram API is stubbed wherever it is called, and nothing in this repository may POST to the deployed relay.
 
-CI runs one battery on every pull request and every push to `master`: install → format check → typecheck → tests. It needs no secrets.
+`npm run smoke` compiles the function the way the platform does — per file, no bundler — and imports the result under real Node ESM rules. It exists because a missing file extension in a relative import passes `tsc`, passes vitest, passes the Vercel _build_, and then fails at load time on the first real request.
+
+CI runs one battery on every pull request and every push to `master`: install → format check → typecheck → load smoke → tests. It needs no secrets.
 
 ## Deployment
 
