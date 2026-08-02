@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST } from "../api/place_order";
+import { POST } from "../api/place_order.js";
 import {
   BOT_TOKEN,
   buildOrder,
   CHAT_ID,
   StubRequest,
-} from "./support/orderPayload";
-import { stubTelegram } from "./support/telegram";
+} from "./support/orderPayload.js";
+import { stubTelegram } from "./support/telegram.js";
 
 const SECRET = "s3cr3t-relay-value";
 

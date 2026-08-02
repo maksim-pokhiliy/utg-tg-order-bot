@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { parseOrderPayload, type RejectReason } from "../src/payload";
-import { buildCartItem, buildOrder } from "./support/orderPayload";
+import { parseOrderPayload, type RejectReason } from "../src/payload.js";
+import { buildCartItem, buildOrder } from "./support/orderPayload.js";
 
 const expectReject = (
   overrides: Record<string, unknown>,

@@ -62,6 +62,9 @@ export const readSentMessage = (
 export const captureConsoleError = (): MockInstance =>
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 
+export const captureConsoleWarn = (): MockInstance =>
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
 export const joinLoggedLines = (spy: MockInstance): string =>
   spy.mock.calls
     .map((args) => args.map((arg) => String(arg)).join(" "))

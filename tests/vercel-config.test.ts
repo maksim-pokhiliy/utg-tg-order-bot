@@ -30,4 +30,10 @@ describe("vercel.json", () => {
     expect(record["routes"]).toBeUndefined();
     expect(record["version"]).toBeUndefined();
   });
+
+  it("gives the function more time than the upstream call is allowed", () => {
+    expect(asRecord(config)["functions"]).toEqual({
+      "api/place_order.ts": { maxDuration: 15 },
+    });
+  });
 });

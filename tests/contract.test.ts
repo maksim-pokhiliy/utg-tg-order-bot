@@ -1,14 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST } from "../api/place_order";
-import { CART_ITEM_KEYS, ORDER_PAYLOAD_KEYS } from "../src/payload";
+import { POST } from "../api/place_order.js";
+import { CART_ITEM_KEYS, ORDER_PAYLOAD_KEYS } from "./support/contract.js";
 import {
   BOT_TOKEN,
   buildOrder,
   CHAT_ID,
   RELAY_URL,
-} from "./support/orderPayload";
-import { stubTelegram } from "./support/telegram";
+} from "./support/orderPayload.js";
+import { stubTelegram } from "./support/telegram.js";
 
 const IGNORED_KEYS = new Set(["then", "length", "constructor"]);
 

@@ -1,4 +1,4 @@
-import type { OrderCartItem, OrderPayload, PlainDecimal } from "./payload";
+import type { OrderCartItem, OrderPayload, PlainDecimal } from "./payload.js";
 
 const MAX_TELEGRAM_TEXT_LENGTH = 4096;
 const CONTACT_FIELD_LIMIT = 200;
@@ -6,14 +6,38 @@ const ADDITIONAL_LIMIT = 600;
 const TOTAL_LIMIT = 60;
 const CART_TITLE_LIMIT = 200;
 const CART_URL_LIMIT = 400;
-const OMITTED_MARKER_ALLOWANCE = 64;
+const MAX_ESCAPE_EXPANSION = 5;
+const MAX_OMITTED_DIGITS = 6;
 const ELLIPSIS = "…";
 const ITEM_SEPARATOR = "\n\n";
+const PRODUCTS_HEADING = "🛒 <b>Products:</b>";
+const LEGACY_LISTING_PREFIX = " ";
 
 const DEFAULT_LOCALE = "uk";
-const STYLE_LOCALES = ["uk", "en"] as const;
-const LOCALE_CURRENCY: Record<string, string> = { uk: "UAH", en: "USD" };
 const FALLBACK_CURRENCY = "UAH";
+const STYLE_LOCALES: ReadonlySet<string> = new Set(["uk", "en"]);
+const LOCALE_CURRENCY: ReadonlyMap<string, string> = new Map([
+  ["uk", "UAH"],
+  ["en", "USD"],
+]);
+
+const buildOmittedMarker = (omitted: number): string =>
+  `${ELLIPSIS} <b>+${String(omitted)} more positions</b>`;
+
+const OMITTED_MARKER_ALLOWANCE =
+  countCodePoints(buildOmittedMarker(0)) +
+  MAX_OMITTED_DIGITS +
+  countCodePoints(ITEM_SEPARATOR);
+
+export function countCodePoints(value: string): number {
+  let total = 0;
+
+  for (const _ of value) {
+    total += 1;
+  }
+
+  return total;
+}
 
 export const escapeHtml = (value: string): string =>
   value
@@ -22,6 +46,10 @@ export const escapeHtml = (value: string): string =>
     .replaceAll(">", "&gt;");
 
 export const clampEscaped = (escaped: string, limit: number): string => {
+  if (escaped.length <= limit) {
+    return escaped;
+  }
+
   const points = Array.from(escaped);
 
   if (points.length <= limit) {
@@ -33,16 +61,19 @@ export const clampEscaped = (escaped: string, limit: number): string => {
   return sliced.replace(/&[a-zA-Z]*$/, "") + ELLIPSIS;
 };
 
-const field = (value: string, limit: number): string =>
-  clampEscaped(escapeHtml(value), limit);
+const field = (value: string, limit: number): string => {
+  const bounded = value.slice(0, limit * MAX_ESCAPE_EXPANSION);
+
+  return clampEscaped(escapeHtml(bounded.toWellFormed()), limit);
+};
 
 const resolveStyleLocale = (locale: string): string =>
-  STYLE_LOCALES.some((known) => known === locale) ? locale : DEFAULT_LOCALE;
+  STYLE_LOCALES.has(locale) ? locale : DEFAULT_LOCALE;
 
 const resolveCurrency = (
   currency: string | undefined,
   locale: string
-): string => currency ?? LOCALE_CURRENCY[locale] ?? FALLBACK_CURRENCY;
+): string => currency ?? LOCALE_CURRENCY.get(locale) ?? FALLBACK_CURRENCY;
 
 export const formatTotal = (
   total: PlainDecimal,
@@ -70,9 +101,9 @@ const buildHeader = (payload: OrderPayload): string =>
     )}`,
     `📄 <b>Additional Information:</b> ${field(payload.additional, ADDITIONAL_LIMIT)}`,
     "",
-    "🛒 <b>Products:</b>",
+    PRODUCTS_HEADING,
     "",
-    "",
+    LEGACY_LISTING_PREFIX,
   ].join("\n");
 
 const buildItem = (item: OrderCartItem): string =>
@@ -85,14 +116,18 @@ const buildItem = (item: OrderCartItem): string =>
 export const buildOrderMessage = (payload: OrderPayload): string => {
   const header = buildHeader(payload);
   const budget =
-    MAX_TELEGRAM_TEXT_LENGTH - header.length - OMITTED_MARKER_ALLOWANCE;
+    MAX_TELEGRAM_TEXT_LENGTH -
+    countCodePoints(header) -
+    OMITTED_MARKER_ALLOWANCE;
 
+  const separatorCost = countCodePoints(ITEM_SEPARATOR);
   const rendered: string[] = [];
   let used = 0;
 
   for (const item of payload.cart) {
     const block = buildItem(item);
-    const cost = rendered.length === 0 ? block.length : block.length + 2;
+    const cost =
+      countCodePoints(block) + (rendered.length === 0 ? 0 : separatorCost);
 
     if (used + cost > budget) {
       break;
@@ -109,7 +144,7 @@ export const buildOrderMessage = (payload: OrderPayload): string => {
     return header + body;
   }
 
-  const marker = `… <b>+${String(omitted)} more positions</b>`;
+  const marker = buildOmittedMarker(omitted);
 
   return rendered.length === 0
     ? header + marker

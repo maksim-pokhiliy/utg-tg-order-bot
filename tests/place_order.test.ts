@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { POST } from "../api/place_order";
+import { POST } from "../api/place_order.js";
 import {
   BOT_TOKEN,
   BrokenBodyRequest,
@@ -8,13 +8,14 @@ import {
   CHAT_ID,
   StubRequest,
   TELEGRAM_URL,
-} from "./support/orderPayload";
+} from "./support/orderPayload.js";
 import {
   captureConsoleError,
+  captureConsoleWarn,
   joinLoggedLines,
   readSentMessage,
   stubTelegram,
-} from "./support/telegram";
+} from "./support/telegram.js";
 
 const readJson = async (response: Response): Promise<unknown> =>
   response.json();
@@ -114,7 +115,7 @@ describe("POST /api/place_order", () => {
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
-  it("logs the upstream status and description but no payload field", async () => {
+  it("logs the upstream status and error code, never the description", async () => {
     const logs = captureConsoleError();
 
     stubTelegram(
@@ -122,7 +123,9 @@ describe("POST /api/place_order", () => {
         new Response(
           JSON.stringify({
             ok: false,
-            description: "Bad Request: chat not found",
+            error_code: 400,
+            description:
+              "Bad Request: can't parse entities: unexpected end near вул. Шевченка",
           }),
           { status: 400 }
         )
@@ -133,7 +136,9 @@ describe("POST /api/place_order", () => {
     const logged = joinLoggedLines(logs);
 
     expect(logged).toContain("telegram_send_rejected");
-    expect(logged).toContain("chat not found");
+    expect(logged).toContain("errorCode");
+    expect(logged).not.toContain("description");
+    expect(logged).not.toContain("parse entities");
     expect(logged).not.toContain("Олександр");
     expect(logged).not.toContain("+380671234567");
     expect(logged).not.toContain("вул. Шевченка");
@@ -158,7 +163,7 @@ describe("POST /api/place_order", () => {
   });
 
   it("logs a machine reason for a rejected payload and no field value", async () => {
-    const logs = captureConsoleError();
+    const logs = captureConsoleWarn();
 
     stubTelegram();
 

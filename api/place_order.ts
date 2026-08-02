@@ -1,7 +1,7 @@
-import { isAuthorized } from "../src/auth";
-import { buildOrderMessage } from "../src/message";
-import { parseOrderPayload } from "../src/payload";
-import { sendOrderMessage } from "../src/telegram";
+import { isAuthorized } from "../src/auth.js";
+import { buildOrderMessage } from "../src/message.js";
+import { parseOrderPayload } from "../src/payload.js";
+import { sendOrderMessage } from "../src/telegram.js";
 
 const SUCCESS_BODY = { status: "success" };
 const ERROR_BODY = { status: "error" };
@@ -21,9 +21,9 @@ const readBody = async (request: Request): Promise<unknown> => {
   }
 };
 
-export async function POST(request: Request): Promise<Response> {
+const relay = async (request: Request): Promise<Response> => {
   if (!isAuthorized(request)) {
-    console.error(JSON.stringify({ event: "relay_auth_rejected" }));
+    console.warn(JSON.stringify({ event: "relay_auth_rejected" }));
 
     return failure(HTTP_UNAUTHORIZED);
   }
@@ -31,7 +31,7 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = parseOrderPayload(await readBody(request));
 
   if (!parsed.ok) {
-    console.error(
+    console.warn(
       JSON.stringify({ event: "payload_rejected", reason: parsed.reason })
     );
 
@@ -40,9 +40,20 @@ export async function POST(request: Request): Promise<Response> {
 
   const sent = await sendOrderMessage(buildOrderMessage(parsed.value));
 
-  if (!sent.ok) {
+  return sent.ok ? Response.json(SUCCESS_BODY) : failure(HTTP_SERVER_ERROR);
+};
+
+export async function POST(request: Request): Promise<Response> {
+  try {
+    return await relay(request);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "relay_unhandled_error",
+        errorName: error instanceof Error ? error.name : "unknown",
+      })
+    );
+
     return failure(HTTP_SERVER_ERROR);
   }
-
-  return Response.json(SUCCESS_BODY);
 }

@@ -5,9 +5,9 @@ import {
   clampEscaped,
   escapeHtml,
   formatTotal,
-} from "../src/message";
-import { parseOrderPayload, type OrderPayload } from "../src/payload";
-import { buildCartItem, buildOrder } from "./support/orderPayload";
+} from "../src/message.js";
+import { parseOrderPayload, type OrderPayload } from "../src/payload.js";
+import { buildCartItem, buildOrder } from "./support/orderPayload.js";
 
 const NBSP = " ";
 
@@ -45,9 +45,21 @@ describe("formatTotal", () => {
   });
 
   it("formats an unknown but valid locale with the uk number style", () => {
-    expect(formatTotal("46200.00", "pl", "UAH")).toBe(
+    expect(formatTotal("46200.00", "de", "UAH")).toBe(
       `46${NBSP}200,00${NBSP}₴`
     );
+    expect(new Intl.NumberFormat("de").format(46200)).toBe("46.200");
+  });
+
+  it("defaults to hryvnia when the locale is unknown and currency is absent", () => {
+    expect(formatTotal("46200.00", "de", undefined)).toContain("₴");
+  });
+
+  it("does not walk the prototype chain for an object-key locale", () => {
+    for (const locale of ["constructor", "toString", "__proto__", "valueOf"]) {
+      expect(() => formatTotal("46200.00", locale, undefined)).not.toThrow();
+      expect(formatTotal("46200.00", locale, undefined)).toContain("₴");
+    }
   });
 });
 
@@ -79,6 +91,16 @@ describe("clampEscaped", () => {
     expect(Buffer.from(clamped, "utf8").toString("utf8")).toBe(clamped);
     expect(clamped).not.toMatch(/[\uD800-\uDFFF]/u);
   });
+
+  it("bounds the work it does on a huge value instead of exploding it", () => {
+    const before = process.memoryUsage().heapUsed;
+
+    buildOrderMessage(parse({ additional: "&".repeat(4_000_000) }));
+
+    const grown = process.memoryUsage().heapUsed - before;
+
+    expect(grown).toBeLessThan(120_000_000);
+  });
 });
 
 describe("buildOrderMessage", () => {
@@ -93,6 +115,62 @@ describe("buildOrderMessage", () => {
     expect(message).toContain("🏷️ <b>Title:</b> Шеврон «Очікування»");
     expect(message).toContain("🔢 <b>Quantity:</b> 2");
     expect(message.indexOf("👤")).toBeLessThan(message.indexOf("🛒"));
+  });
+
+  it("escapes a hostile cart title", () => {
+    const message = buildOrderMessage(
+      parse({ cart: [buildCartItem({ title: "<b>Patch</b> & co" })] })
+    );
+
+    expect(message).toContain(
+      "🏷️ <b>Title:</b> &lt;b&gt;Patch&lt;/b&gt; &amp; co"
+    );
+    expect(message).not.toContain("<b>Patch</b>");
+  });
+
+  it("escapes the ampersands a product url query string carries", () => {
+    const message = buildOrderMessage(
+      parse({
+        cart: [
+          buildCartItem({
+            productUrl: "https://shop.test/p?a=1&b=2&utm=<x>",
+          }),
+        ],
+      })
+    );
+
+    expect(message).toContain(
+      "🔗 <b>Product URL:</b> https://shop.test/p?a=1&amp;b=2&amp;utm=&lt;x&gt;"
+    );
+    expect(message).not.toMatch(/&(?!amp;|lt;|gt;)/);
+  });
+
+  it("replaces lone surrogates that valid json can carry", () => {
+    const message = buildOrderMessage(parse({ city: "Ky\uD800iv" }));
+
+    expect(message).not.toMatch(/[\uD800-\uDFFF]/u);
+    expect(message).toContain("Ky�iv");
+  });
+
+  it("keeps the budget in code points when fields are non-BMP", () => {
+    const astral = "𝕏".repeat(200);
+    const message = buildOrderMessage(
+      parse({
+        first_name: astral,
+        last_name: astral,
+        telephone: astral,
+        country: astral,
+        state: astral,
+        city: astral,
+        address: astral,
+        additional: "𝕏".repeat(600),
+        cart: [buildCartItem(), buildCartItem({ title: "Second" })],
+      })
+    );
+
+    expect(message).toContain("🏷️ <b>Title:</b>");
+    expect(message).toContain("Second");
+    expect(message).not.toMatch(/\+\d+ more positions/);
   });
 
   it("escapes hostile field content instead of relaying markup", () => {
