@@ -1,6 +1,6 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-02 (B1 gate A answered — BD-9 ruled, 4096-degrade in scope; executor implementing toward the PR)
+**Updated:** 2026-08-02 (B1 review: REQUEST CHANGES — RF-1 deploy-blocker confirmed, ESM specifiers would keep the function from loading in prod; 18 findings routed, fix round dispatched to the original executor)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -14,11 +14,12 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 ## Next action
 
-B1 gate A is answered (all seven rulings in the journal; BD-9 is the sanctioned locale
-deviation) — the executor implements toward the PR. Then: independent review (phase 4,
-`/review-flow` deep), fix rounds to the original executor, planner verification, owner
-merge, prod deploy verify + TEST-labeled smoke in the real operators' chat (BD-8), docs
-promotion here AND in the shop ledger. PARKED FOR THE OWNER (non-blocking, decide by
+B1 fix round is with the original executor (all 18 review findings routed fix-now
+except the refuted length-rejection claim and the untestable-timing aspect of RF-14 —
+converted to a source-pin test; routing detail in the journal). Then: planner
+verification (phase 6 — re-run the battery, spot-verify RF-1/RF-2/RF-4 fixes at
+source, check the PR file list), owner merge, prod deploy verify + TEST-labeled smoke
+in the real operators' chat (BD-8), docs promotion here AND in the shop ledger. PARKED FOR THE OWNER (non-blocking, decide by
 merge time): Vercel "Protection Bypass for Automation" toggle — enables a functional
 preview check (error-path POSTs only, nothing reaches the chat) before merging; the
 alternative is merge on build-green + immediate smoke + revert-ready.

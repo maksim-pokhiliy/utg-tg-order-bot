@@ -58,3 +58,50 @@ Append-only. One entry per session/step.
   question is the owner's and non-blocking (parked on the board).
 - Process note for the /feature retro: two research agents raced on one scratch
   artifact (one overwrite, recovered) — artifact ownership per agent next time.
+
+## 2026-08-02 — B1 review: the adversarial layer pays for itself on its first PR
+
+- `/review-flow` deep on PR #1 returned REQUEST CHANGES with a genuine
+  deploy-blocker no green signal had caught: **RF-1** — four extensionless relative
+  imports + `"type": "module"` + `moduleResolution: "bundler"` typecheck clean, pass
+  60/60 tests, build a READY preview… and the deployed function cannot LOAD:
+  `@vercel/node` transpiles per-file (no bundling) and native ESM demands explicit
+  specifiers — every live order would 500 the moment master deployed. Reviewer
+  reproduced three independent ways (real `vercel build` + launcher import, tsconfig
+  transpile + `import()`, and plain `node api/place_order.ts` on Node 24); planner
+  spot-verified the premise at source. The class is invisible to the whole battery
+  by construction — the ruling makes it compile-time forever (`nodenext`) plus a CI
+  load-smoke of the real module.
+- The refute stage earned its keep in BOTH directions: 12/15 findings CONFIRMED, and
+  the scariest claim — "a valid order can be REJECTED for length" — was killed by a
+  refuter reading TDLib sources (the 4096 limit counts code points; max reachable is
+  ~3515). All three finder lenses AND the breaker had converged on that same wrong
+  premise — convergence was shared error, not confirmation. Also refuted: the 4729×
+  CPU-amplification framing (linear, ~1.3×/byte; the real issue is ~103× MEMORY),
+  prototype pollution, CSRF.
+- Confirmed and routed fix-now: prototype-chain crash via `locale: "constructor"`
+  (naked platform 500 breaks the frozen error contract; needs null-proto map + a
+  try/catch boundary the handler never had), padded-secret lockout (`" s3cr3t "`
+  can never match any client header — the exact typo class the blank-check was built
+  against, detonating at B2; fix is `trim()` at a single env-read boundary, same for
+  the bot token), Telegram `200 {ok:false}` swallowed as silent success (buyer sees
+  success, operators get nothing, zero log lines), unpinned cart-field escaping and
+  contact-line mapping (mutations stay green — golden-message + escaping tests
+  mandated), no fetch timeout, escape-before-clamp memory amplification (4 MB field
+  → +455 MB RSS; regression vs bodyParser's 100 KB cap — pre-slice before escaping),
+  UTF-16/code-point budget mismatch (premature zero-item degradation), lone
+  surrogates (`.toWellFormed()`), and the relay domain statically serving the whole
+  repo including `initiatives/` (`.vercelignore`). Logging ruling tightened while
+  routing RF-4+RF-12: Telegram `error_code` only, never `description` — it can quote
+  buyer data, and the standing no-PII-in-logs law wins; README aligned.
+- Dropped/converted with reason: the length-rejection claim (refuted, nothing to
+  fix), timing-oracle testability of `timingSafeEqual` (behaviorally untestable —
+  converted to a source-presence pin per the repo's drift-guard idiom). Candidate
+  counts honest: 70 pre-dedup across lenses → 40 reported → 18 after dedup, no caps
+  applied; 33 breaker mutants, 32 killed pre-fix-round.
+- Tooling notes for the retro (with the two from gate A): the reviewer's orchestrator
+  spawned ~24 self-expiring `until $SECONDS` sleep-shells to poll its panel — agents
+  don't know harness notifications wake them; codify "never poll subagents" in
+  review-flow. And the breaker's first mutant run reported 33/33 SURVIVED due to its
+  own ANSI-grep harness bug — it caught and fixed itself, but "mutant harness must
+  assert APPLIED/NO-OP" belongs in the skill text.
