@@ -197,3 +197,38 @@ Append-only. One entry per session/step.
   the merge also moves the function runtime to Node 24 (`engines` overrides the
   dashboard's 20.x) and migrates the project off legacy `builds`/`routes` config —
   both called out in the PR body.
+
+## 2026-08-03 — B1 CLOSED: merged, prod-verified, smoked; the dead-chat incident
+
+- The owner merged PR #1 (`2a1dea3`, merge commit, CI green on the merge SHA) and
+  pruned the remote branch. Planner prod verification on the canonical domain
+  (`telegram-bot-server-sage.vercel.app`): deploy READY with one lambda; GET → 405
+  and empty-POST → 400 with the frozen body on BOTH routes. The new code is
+  demonstrably live — the old express app answered that same probe with an HTML 500
+  out of `cart.map`.
+- BD-8 smoke first FAILED: 500 with `telegram_send_rejected {status:400,
+  errorCode:400}`. Not a regression — the operators' chat had died, and the old
+  relay would have failed identically (while leaking `error.message` to the caller).
+  Runtime logs across the whole retention window show ZERO real orders, so nobody
+  was hit and nobody had noticed; the structured-reason logging shipped hours
+  earlier turned the diagnosis into a three-minute log read. HTTP 400 (not 401/403)
+  cleared the token and the bot's standing up front; a locally rebuilt byte-exact
+  message cleared `can't parse entities`; the owner's `getChat` probe confirmed the
+  chat itself was gone.
+- Resolution: a new private operators' group, bot re-added, `TELEGRAM_CHAT_ID`
+  updated in the production env, redeploy, smoke → 200 and the owner saw the
+  message land with the expected formatting (uk+UAH path; the rates-down en+UAH
+  path stays pinned by the golden/endpoint tests — no second live message needed).
+  The new chat id lives ONLY in the Vercel env — the same recorded-nowhere policy
+  as `PLACE_ORDER_URL`.
+- Operational note: the new group is a basic group; a future supergroup upgrade
+  CHANGES the id and reproduces exactly this failure. The log event names the fix.
+- The bot token crossed the owner's terminal in clear text during diagnosis;
+  rotation via BotFather recommended (owner's call, nothing committed anywhere).
+- The parked preview-bypass question retires for B1: the merge took the
+  build-green + immediate-smoke road and the smoke did its job — reopen only if a
+  future bot step wants pre-merge functional checks.
+- Closed out: board B1 ✅ / B2 next, `CLAUDE.md` de-staled (express-era "current
+  state", `ORDER_RELAY_SECRET` "lands in B1"), DEF-13 progress note promoted to the
+  shop ledger (closure itself stays on B2), and the shop's stranded `dfca818` docs
+  commit — left unpushed by the freeze — pushed along with it.

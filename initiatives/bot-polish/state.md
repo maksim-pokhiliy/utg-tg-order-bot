@@ -1,6 +1,6 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-03 (B1 micro-fix round planner-verified after a host freeze — PR #1 waits at the owner's merge gate)
+**Updated:** 2026-08-03 (B1 CLOSED — merged, prod-verified, BD-8 smoke green in the new operators' chat; B2 next)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -9,26 +9,21 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 | #   | Step                                                             | Status                                        | Pointer                          |
 | --- | ---------------------------------------------------------------- | --------------------------------------------- | -------------------------------- |
-| B1  | Relay rewrite (currency read, injection fix, validation, floor) | 🔵 active — executor round open via `/step`   | `step-b1-relay-rewrite-prompt.md` |
-| B2  | Shop-side secret sender + env enablement                        | ⬜ pending (after B1)                         | `deferred.md` BDEF-1             |
+| B1  | Relay rewrite (currency read, injection fix, validation, floor) | ✅ shipped — merged `2a1dea3`, prod-smoked    | journal 2026-08-03               |
+| B2  | Shop-side secret sender + env enablement                        | ⬜ next                                       | `deferred.md` BDEF-1             |
 
 ## Next action
 
-B1 is MERGE-READY from the planner's side: the micro-fix round (RF-19 blocker + the
-routed batch) is verified in code, the RF-19 guard adversarially spot-checked, the
-battery green locally under the WSL fence and in CI on HEAD `0b64b48`, the PR body
-truth-fixed. Waiting on the OWNER's morning gate: decide the parked preview-bypass
-question (non-blocking) → squash-merge PR #1 → verify the prod deploy → BD-8
-TEST-labeled smoke in the real operators' chat → docs promotion here AND in the shop
-ledger → tee up B2. Merge-gate notes: the merge moves the runtime to Node 24 and off
-legacy config (PR body, "Rollout and risk"); rollback is revert-merge,
-`dpl_5z6byFckuZ7gRF1ENFRWYMJctCxk` is the candidate.
-
-PARKED FOR THE OWNER (non-blocking, decide at merge time): the Vercel "Protection
-Bypass for Automation" toggle on project `telegram-bot-server` — it would allow a
-functional preview check (error-path POSTs only, nothing reaches the chat) before
-merging; the alternative is merging on build-green + CI load-smoke + immediate smoke
-with a revert ready (`dpl_5z6byFckuZ7gRF1ENFRWYMJctCxk` is the rollback candidate).
+B1 is CLOSED (merged `2a1dea3`, prod-verified on both routes, BD-8 smoke green in
+the NEW operators' chat — the dead-chat incident and its resolution are in the
+journal). Next: B2 via `/step` — the shop-side `x-relay-secret` sender
+(`/feature small` in `../utg-2.0`) plus the BD-4 enablement order (merge sender →
+shop env → bot env), closing BDEF-1 here and DEF-13 in the shop ledger. Owner
+side-items, non-blocking: rotate the bot token (it crossed a terminal in clear
+text during the incident — BotFather revoke + env update + redeploy), delete the
+stale local `feat/relay-rewrite` branch. The preview-bypass question is retired
+for B1 (journal) — reopen only if a future bot step wants pre-merge functional
+checks.
 
 ## Open decisions awaiting ratification
 
@@ -53,3 +48,7 @@ change, its own step).
 - No local `.env` exists; tests mock `fetch`; nobody but the planner/owner ever POSTs
   to the deployed relay (BD-8 smoke) and executors never do.
 - Executor PRs never stage `CLAUDE.md` or `initiatives/` (planner-owned).
+- The operators' chat is a NEW private group (2026-08-03 — the old chat died); its
+  chat id lives ONLY in the Vercel env, recorded nowhere, like `PLACE_ORDER_URL`.
+  It is a basic group: a supergroup upgrade changes the id and reproduces
+  `telegram_send_rejected 400`.

@@ -22,11 +22,14 @@ one message and sends it to the operators' chat via the Telegram Bot API
 Deployed as Vercel project `telegram-bot-server`, auto-deploys `master`. **LIVE — real
 volunteer orders flow through this relay**; every merge must leave it fully functional.
 
-Current state (pre `bot-polish` B1): a single-file express app (`index.js`), no tests,
-no CI — the `bot-polish` initiative rewrites it (see `initiatives/bot-polish/`).
+Current state (post `bot-polish` B1, merged 2026-08-03): a typed zero-dependency
+Vercel function (`api/place_order.ts` + `src/*`) with a vitest suite, a CI battery
+and an ESM load smoke; B2 (shop-side secret sender + env enablement) is next (see
+`initiatives/bot-polish/`).
 
 Env (set in Vercel, no local `.env`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
-`ORDER_RELAY_SECRET` (optional, lands in B1) gates callers when set.
+`ORDER_RELAY_SECRET` (optional; shipped in B1 as enforcement-if-configured, the
+enablement is B2) gates callers when set.
 
 ## The sacred contract
 
