@@ -1,0 +1,24 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+
+import { readEnv } from "./env.js";
+
+const SECRET_HEADER = "x-relay-secret";
+
+const digest = (value: string): Buffer =>
+  createHash("sha256").update(value, "utf8").digest();
+
+export const isAuthorized = (request: Request): boolean => {
+  const secret = readEnv("ORDER_RELAY_SECRET");
+
+  if (secret === undefined) {
+    return true;
+  }
+
+  const presented = request.headers.get(SECRET_HEADER);
+
+  if (presented === null) {
+    return false;
+  }
+
+  return timingSafeEqual(digest(secret), digest(presented.trim()));
+};

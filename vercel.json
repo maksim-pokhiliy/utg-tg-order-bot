@@ -1,15 +1,14 @@
 {
-  "version": 2,
-  "builds": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
     {
-      "src": "index.js",
-      "use": "@vercel/node"
+      "source": "/place_order",
+      "destination": "/api/place_order"
     }
   ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.js"
+  "functions": {
+    "api/place_order.ts": {
+      "maxDuration": 15
     }
-  ]
+  }
 }
