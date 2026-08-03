@@ -1,6 +1,6 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-02 (B1 re-review: MERGE-READY bar RF-19; micro-fix round dispatched, then the owner's merge gate)
+**Updated:** 2026-08-03 (B1 micro-fix round planner-verified after a host freeze — PR #1 waits at the owner's merge gate)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -14,12 +14,15 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 ## Next action
 
-The B1 micro-fix round is with the original executor (RF-19 blocker + nine routed
-items; the rest deferred as BDEF-2/BDEF-3 — routing in the journal). Planner
-verification of the previous round already ran and passed (battery, invariants, PR
-file list clean). Then: the OWNER's merge gate, prod deploy verify + TEST-labeled
-smoke in the real operators' chat (BD-8), docs promotion here AND in the shop ledger,
-then B2.
+B1 is MERGE-READY from the planner's side: the micro-fix round (RF-19 blocker + the
+routed batch) is verified in code, the RF-19 guard adversarially spot-checked, the
+battery green locally under the WSL fence and in CI on HEAD `0b64b48`, the PR body
+truth-fixed. Waiting on the OWNER's morning gate: decide the parked preview-bypass
+question (non-blocking) → squash-merge PR #1 → verify the prod deploy → BD-8
+TEST-labeled smoke in the real operators' chat → docs promotion here AND in the shop
+ledger → tee up B2. Merge-gate notes: the merge moves the runtime to Node 24 and off
+legacy config (PR body, "Rollout and risk"); rollback is revert-merge,
+`dpl_5z6byFckuZ7gRF1ENFRWYMJctCxk` is the candidate.
 
 PARKED FOR THE OWNER (non-blocking, decide at merge time): the Vercel "Protection
 Bypass for Automation" toggle on project `telegram-bot-server` — it would allow a

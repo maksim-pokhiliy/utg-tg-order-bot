@@ -160,3 +160,40 @@ Append-only. One entry per session/step.
   wakes them, so they poll, wait, or misaddress. To codify in review-flow: never spawn
   wait/poll shells, address peers by address, and report from what you have when a
   peer goes silent.
+
+## 2026-08-03 — B1 micro-fix round planner-verified; the pipeline survived a host freeze
+
+- The /step session died mid-pipeline: the WSL VM froze right after the executor
+  pushed the micro-fix round (`0b64b48`, 20:40), before planner verification. A fresh
+  planner session resumed cold from board + git + PR #1 alone and lost nothing
+  load-bearing — the docs-on-master discipline is what made that possible; the only
+  casualty was the dead session's scratch (review artifacts), all of it already
+  promoted. The freeze itself is codified as the resource-budget section in
+  `step/SKILL.md`; this session ran every heavy command under the cgroup fence.
+- Micro-fix delta verified item by item against the routing: RF-19 → the
+  `.vercelignore` test now derives the shipped top-level dirs from `tsc --listFiles`
+  over the smoke tsconfig and asserts each ships; RF-20 → the boundary test mocks a
+  module the handler calls directly, so the try/catch is no longer deleteable;
+  RF-21 → all budget assertions in code points; RF-22 → `ack_unreadable` is a
+  distinct state and log event, a body-read TimeoutError is classified as a timeout,
+  and the AbortError arm is covered; RF-23 → `.env.*` + `!.env.example`; RF-24 → the
+  pin requires the `timingSafeEqual(digest(` call shape and bans `!==` variants;
+  RF-25 → newlines collapse in contact fields, titles and URLs while `additional`
+  keeps its breaks; breaker items → `total` capped at 20 digits, `quantity` at
+  100 000, empty `productUrl` rejected, and quantity now rendered through the same
+  escape+clamp path as every other value.
+- Planner verification, independent of every report: battery re-run locally under
+  the fence (format:check, typecheck, load-smoke, vitest 97/97), the RF-19 guard
+  adversarially spot-checked (a stray `lib/` module imported from `src` turns it
+  red; probe reverted, tree clean), PR #1 file list free of planner artifacts, CI
+  battery SUCCESS on HEAD `0b64b48`, preview READY.
+- PR-body truth pass (the RF-38 class, second catch): "97 tests across ten files" →
+  "nine files" — vitest counts 9 test files; the 13-row mutation table and its
+  prose already agree. Fixed via `gh pr edit` per the skill's stale-description
+  rule.
+- B1 now waits at the OWNER's merge gate with a morning checklist: the parked
+  preview-bypass decision (non-blocking), squash-merge, prod deploy verify, BD-8
+  TEST-labeled smoke, docs promotion here and in the shop ledger. Note for the gate:
+  the merge also moves the function runtime to Node 24 (`engines` overrides the
+  dashboard's 20.x) and migrates the project off legacy `builds`/`routes` config —
+  both called out in the PR body.
