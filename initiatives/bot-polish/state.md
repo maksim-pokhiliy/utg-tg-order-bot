@@ -11,11 +11,21 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 | --- | ---------------------------------------------------------------- | --------------------------------------------- | -------------------------------- |
 | B1  | Relay rewrite (currency read, injection fix, validation, floor) | ✅ shipped — merged `2a1dea3`, prod-smoked    | journal 2026-08-03               |
 | B2  | Shop-side secret sender + env enablement                        | ✅ shipped — shop PR #20 `bb3f866`, enforcement live and verified | shop journal 2026-08-06 |
-| B3  | Relay dual-accepts v1 + v2 payloads (gates the shop's U5a)      | ⬜ next                                       | `plan.md` · shop `requirements.md` §5 |
+| B3  | Relay dual-accepts v1 + v2 payloads (gates the shop's U5a)      | 🔄 executor round open                        | `step-b3-dual-accept-prompt.md` · shop §5 |
+| B4  | Orders persisted to Postgres before the Telegram send           | ⬜ pending                                    | shop D-11 · `deferred.md` BDEF-3      |
 
 ## Next action
 
-**B3 via `/step` in this repo** — the relay learns to accept the v2 order envelope
+**B3 executor round is OPEN.** After it: **B4 — orders become durable** (owner
+ratified 2026-08-06 as shop-side D-11). Today a delivered order is durable NOWHERE:
+its only trace is a Telegram message, and one operators' chat has already died taking
+its history with it; a failed send evaporates the order with no replay path. B4 writes
+each decoded order to Postgres (Neon, the owner's paid plan) BEFORE the send, keyed by
+the new optional `idempotency_key` the shop mints — which also closes BDEF-3 nearly for
+free. **Absolute design rule: the store must never gate the Telegram send.** A database
+that is down costs an audit row, never an order.
+
+The B3 step itself — the relay learns to accept the v2 order envelope
 alongside v1 and render each delivery mode. The shape is shop-side canon:
 `../utg-2.0/initiatives/ua-checkout/requirements.md` §5 (ratified as D-3 there), and
 the rollout order is D-9: bot dual-accepts first, THEN the shop flips its payload
