@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { buildOrderMessage } from "../src/message.js";
+import { renderOrder } from "../src/messageV2.js";
 import { parseOrderPayload } from "../src/payload.js";
+import { parseOrder } from "../src/payloadV2.js";
 
 const CORPUS_PATH = fileURLToPath(
   new URL("./fixtures/v1-golden-corpus.json", import.meta.url)
@@ -76,6 +78,20 @@ const renderThroughV1 = (input: Record<string, unknown>): string => {
   return buildOrderMessage(parsed.value);
 };
 
+const renderThroughDispatch = (input: Record<string, unknown>): string => {
+  const parsed = parseOrder(input);
+
+  if (!parsed.ok) {
+    throw new Error(`corpus fixture rejected by dispatch: ${parsed.reason}`);
+  }
+
+  if (parsed.value.kind !== "v1") {
+    throw new Error("a v1 corpus fixture was routed to the v2 decoder");
+  }
+
+  return renderOrder(parsed.value);
+};
+
 describe("the v1 golden corpus captured from master", () => {
   it("carries every fixture the byte-identity gate requires", () => {
     expect(corpus.entries).toHaveLength(EXPECTED_ENTRIES);
@@ -99,6 +115,12 @@ describe("the v1 golden corpus captured from master", () => {
   for (const entry of corpus.entries) {
     it(`renders ${entry.name} through the v1 path exactly as master did`, () => {
       expect(renderThroughV1(entry.input)).toBe(entry.message);
+    });
+  }
+
+  for (const entry of corpus.entries) {
+    it(`routes ${entry.name} through the dispatcher to the same bytes`, () => {
+      expect(renderThroughDispatch(entry.input)).toBe(entry.message);
     });
   }
 });

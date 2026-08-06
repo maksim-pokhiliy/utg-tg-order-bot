@@ -1,10 +1,14 @@
 # utg-tg-order-bot
 
-The order relay for the [Ukrainian Tactical Gear](https://www.ua-tactical-gear.com) shop — a volunteer merch store whose proceeds go to the front. The storefront POSTs its checkout payload here; this service validates it, formats one Telegram message, and delivers it to the operators' chat through the Bot API (`sendMessage`, bot `@utg_orders_bot`). It is a single zero-dependency TypeScript function on Vercel: no database, no queue, no state.
+The order relay for the [Ukrainian Tactical Gear](https://www.ua-tactical-gear.com) shop — a volunteer merch store whose proceeds go to the front. The storefront POSTs its checkout payload here; this service validates it, formats one Telegram message, and delivers it to the operators' chat through the Bot API (`sendMessage`, bot `@utg_orders_bot`). It is a single zero-dependency TypeScript function on Vercel: it validates, formats and forwards, holding no state of its own.
 
 ## The payload contract
 
-The shop owns this shape. The relay never requires a key the shop does not send, and tolerates unknown extra keys.
+The shop owns both shapes below. The relay never requires a key the shop does not send, and unknown keys are ignored at every level — that is what lets the shop add a field without a version bump.
+
+A top-level `version` selects the decoder: `2` reads the v2 envelope, an absent `version` or `1` reads the v1 shape, and any other value is rejected as `version_unsupported` rather than being pushed through a decoder that cannot describe it. Both shapes are live at once during the shop's rollout; a later step retires v1.
+
+### v1 — the flat shape (live today)
 
 | Key                                                                           | Type     | Required | Notes                                                                                                  |
 | ----------------------------------------------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------ |
@@ -21,6 +25,51 @@ The shop owns this shape. The relay never requires a key the shop does not send,
 Other `cart[]` keys the shop sends (`id`, `price`, `image`) are accepted and ignored. A test pins the exact set of keys the relay reads, so adding a dependency on a new key fails the build.
 
 `currency` is authoritative on purpose: when the exchange-rate feed is down the shop quotes hryvnia to both locales and sends `currency: "UAH"` under `locale: "en"`. Deriving the currency from the locale would show the operator a dollar figure on a hryvnia amount.
+
+### v2 — the discriminated envelope
+
+Ukrainian delivery does not fit a flat address string, so v2 nests the recipient under `customer` and makes delivery a discriminated choice.
+
+```json
+{
+  "version": 2,
+  "idempotency_key": "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731",
+  "locale": "uk",
+  "customer": {
+    "first_name": "Марія",
+    "last_name": "Шевченко",
+    "patronymic": "Іванівна",
+    "phone": "+380671234567",
+    "contact_channel": "telegram"
+  },
+  "delivery": {
+    "mode": "np_branch",
+    "source": "np_directory",
+    "city": "м. Львів, Львівська обл.",
+    "warehouse": "Відділення №1: вул. Городоцька, 359",
+    "warehouse_number": "1"
+  },
+  "comment": "після 18:00",
+  "cart": [{ "title": "…", "quantity": 1, "productUrl": "…" }],
+  "total": "250.00",
+  "currency": "UAH"
+}
+```
+
+`cart`, `total`, `currency` and `locale` behave exactly as in v1. `comment` replaces `additional`. `idempotency_key` is carried but never rendered and never required — a later step consumes it.
+
+| `delivery.mode` | Fields                                                |
+| --------------- | ----------------------------------------------------- |
+| `np_branch`     | `city`, `warehouse`, `warehouse_number?`, `source?`   |
+| `np_postomat`   | same as `np_branch`                                   |
+| `np_courier`    | `city`, `street`, `building`, `apartment?`, `source?` |
+| `generic`       | `country`, `state?`, `city`, `address` — no `source`  |
+
+The relay requires only what it cannot render an order without: `delivery.mode`, the non-optional fields of the resolved mode, and `customer.first_name` / `last_name` / `phone`. A missing `source`, `warehouse_number` or `contact_channel` costs the operator a hint, never the buyer their order. `contact_channel` is rendered verbatim — the shop pins its own value set, the relay does not second-guess it.
+
+`source` tells the operator where the address came from: `np_directory` means it was picked out of the carrier's directory, `manual` means it was typed by hand and renders as _verify on the call_. An absent or unrecognised value renders the same warning rather than silence, because assuming an address was verified is the expensive mistake. On a courier order `np_directory` covers the city only — the street is always typed by hand — and the rendered line says so.
+
+`generic` is not a synonym for the English locale: it ships under `locale: "uk"` too while the shop's Ukrainian delivery is still free-text, so neither field may be inferred from the other.
 
 ## Responses
 

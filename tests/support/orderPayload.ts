@@ -40,6 +40,76 @@ export const buildOrder = (
   ...overrides,
 });
 
+export const buildCustomerV2 = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> => ({
+  first_name: "Марія",
+  last_name: "Шевченко",
+  patronymic: "Іванівна",
+  phone: "+380671234567",
+  contact_channel: "telegram",
+  ...overrides,
+});
+
+export const buildDeliveryBranch = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> => ({
+  mode: "np_branch",
+  source: "np_directory",
+  city: "м. Львів, Львівська обл.",
+  warehouse: "Відділення №1: вул. Городоцька, 359",
+  warehouse_number: "1",
+  ...overrides,
+});
+
+export const buildDeliveryPostomat = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> =>
+  buildDeliveryBranch({
+    mode: "np_postomat",
+    warehouse: "Поштомат №12345: вул. Стрийська, 30, магазин «АТБ»",
+    warehouse_number: "12345",
+    ...overrides,
+  });
+
+export const buildDeliveryCourier = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> => ({
+  mode: "np_courier",
+  source: "manual",
+  city: "м. Львів, Львівська обл.",
+  street: "вул. Городоцька",
+  building: "359",
+  apartment: "12",
+  ...overrides,
+});
+
+export const buildDeliveryGeneric = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> => ({
+  mode: "generic",
+  country: "Poland",
+  state: "Lesser Poland",
+  city: "Kraków",
+  address: "ul. Floriańska 3/5",
+  ...overrides,
+});
+
+export const buildOrderV2 = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> => ({
+  version: 2,
+  idempotency_key: "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731",
+  locale: "uk",
+  customer: buildCustomerV2(),
+  delivery: buildDeliveryBranch(),
+  comment: "після 18:00",
+  cart: [buildCartItem()],
+  total: "250.00",
+  currency: "UAH",
+  ...overrides,
+});
+
 export class StubRequest extends Request {
   readonly #payload: unknown;
 
@@ -58,4 +128,14 @@ export class BrokenBodyRequest extends Request {
 
   override json = (): Promise<unknown> =>
     Promise.reject(new SyntaxError("Unexpected token"));
+}
+
+export class JsonBodyRequest extends Request {
+  constructor(payload: unknown, headers: Record<string, string> = {}) {
+    super(RELAY_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body: JSON.stringify(payload),
+    });
+  }
 }
