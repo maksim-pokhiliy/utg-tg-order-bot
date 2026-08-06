@@ -163,6 +163,7 @@ const GENERIC_GOLDEN = [
   "📞 <b>Telephone:</b> PhoneValue",
   "💬 <b>Preferred Contact:</b> ContactChannelValue",
   "🚚 <b>Delivery:</b> Free-form address",
+  "🔎 <b>Address Source:</b> typed by hand — verify on the call",
   "🌍 <b>Country:</b> CountryValue",
   "🌍 <b>State:</b> StateValue",
   "🌍 <b>City:</b> CityValue",
@@ -430,16 +431,26 @@ describe("the v2 delivery blocks", () => {
     }
   });
 
-  it("never gives a free-form address a source line, even when the wire body carries one", () => {
+  it("always calls a free-form address hand-typed, whatever the wire body claims", () => {
     const message = render(
       buildOrderV2({
         delivery: buildDeliveryGeneric({ source: "np_directory" }),
       })
     );
 
-    expect(message).not.toContain(LABEL_SOURCE);
-    expect(sourceLineOf(message)).toBeUndefined();
+    expect(sourceLineOf(message)).toBe(`${LABEL_SOURCE} ${SOURCE_MANUAL}`);
     expect(message).not.toContain(SOURCE_DIRECTORY);
+  });
+
+  it("gives every free-form address exactly one source line", () => {
+    for (const locale of ["uk", "en"]) {
+      const message = render(
+        buildOrderV2({ locale, delivery: buildDeliveryGeneric() })
+      );
+
+      expect(message.split(LABEL_SOURCE)).toHaveLength(2);
+      expect(sourceLineOf(message)).toBe(`${LABEL_SOURCE} ${SOURCE_MANUAL}`);
+    }
   });
 });
 

@@ -1,9 +1,4 @@
-import type {
-  DeliveryMode,
-  DeliverySource,
-  OrderDelivery,
-  WarehouseMode,
-} from "./delivery.js";
+import type { DeliveryMode, OrderDelivery } from "./delivery.js";
 import {
   additionalLine,
   addressLine,
@@ -67,30 +62,26 @@ const customerLines = (customer: OrderCustomer): readonly string[] => [
   ),
 ];
 
-const resolveSourceText = (
-  mode: WarehouseMode | "np_courier",
-  source: DeliverySource | undefined
-): string => {
-  if (source === "manual") {
+const resolveSourceText = (delivery: OrderDelivery): string => {
+  if (delivery.mode === "generic") {
     return SOURCE_MANUAL;
   }
 
-  if (source === "np_directory") {
-    return mode === "np_courier" ? SOURCE_DIRECTORY_COURIER : SOURCE_DIRECTORY;
+  if (delivery.source === "manual") {
+    return SOURCE_MANUAL;
+  }
+
+  if (delivery.source === "np_directory") {
+    return delivery.mode === "np_courier"
+      ? SOURCE_DIRECTORY_COURIER
+      : SOURCE_DIRECTORY;
   }
 
   return SOURCE_UNSTATED;
 };
 
-const sourceLines = (delivery: OrderDelivery): readonly string[] =>
-  delivery.mode === "generic"
-    ? []
-    : [
-        `🔎 <b>Address Source:</b> ${resolveSourceText(
-          delivery.mode,
-          delivery.source
-        )}`,
-      ];
+const sourceLine = (delivery: OrderDelivery): string =>
+  `🔎 <b>Address Source:</b> ${resolveSourceText(delivery)}`;
 
 const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
   if (delivery.mode === "generic") {
@@ -134,7 +125,7 @@ const commentLines = (comment: string | undefined): readonly string[] =>
 const buildHeaderV2 = (payload: OrderPayloadV2): readonly string[] => [
   ...customerLines(payload.customer),
   `🚚 <b>Delivery:</b> ${DELIVERY_MODE_LABELS[payload.delivery.mode]}`,
-  ...sourceLines(payload.delivery),
+  sourceLine(payload.delivery),
   ...deliveryLines(payload.delivery),
   totalLine(payload.total, payload.locale, payload.currency),
   ...commentLines(payload.comment),

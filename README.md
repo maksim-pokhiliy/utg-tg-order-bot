@@ -69,6 +69,8 @@ The relay requires only what it cannot render an order without: `delivery.mode`,
 
 `source` tells the operator where the address came from: `np_directory` means it was picked out of the carrier's directory, `manual` means it was typed by hand and renders as _verify on the call_. An absent or unrecognised value renders the same warning rather than silence, because assuming an address was verified is the expensive mistake. On a courier order `np_directory` covers the city only — the street is always typed by hand — and the rendered line says so.
 
+**Every order carries that line, including `generic`**, which has no `source` field at all: a free-form address is hand-typed by definition, so it renders _typed by hand — verify on the call_. Two reasons it is unconditional. It is true — that is what free-form means. And it guarantees the operator always has a genuine, bold source line on screen: a comment can legitimately contain newlines, so without a real line beside it, text a buyer typed could pass for a provenance claim they never made.
+
 `generic` is not a synonym for the English locale: it ships under `locale: "uk"` too while the shop's Ukrainian delivery is still free-text, so neither field may be inferred from the other.
 
 ## Responses
