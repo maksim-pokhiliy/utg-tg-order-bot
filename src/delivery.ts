@@ -70,8 +70,11 @@ const readSource = (input: Record<string, unknown>): SourceResult => {
   };
 };
 
-const readWarehouseNumber = (input: Record<string, unknown>): NumberResult => {
-  const value = input["warehouse_number"];
+const readNumberedText = (
+  input: Record<string, unknown>,
+  key: string
+): NumberResult => {
+  const value = input[key];
 
   if (typeof value === "number") {
     return Number.isSafeInteger(value) && value >= 0
@@ -79,7 +82,7 @@ const readWarehouseNumber = (input: Record<string, unknown>): NumberResult => {
       : { ok: false };
   }
 
-  return readOptionalText(input, "warehouse_number");
+  return readOptionalText(input, key);
 };
 
 const readWarehouse = (
@@ -94,7 +97,7 @@ const readWarehouse = (
     return "delivery_field_missing";
   }
 
-  const number = readWarehouseNumber(input);
+  const number = readNumberedText(input, "warehouse_number");
 
   if (!number.ok) {
     return "delivery_optional_not_string";
@@ -115,7 +118,7 @@ const readCourier = (
     return "delivery_field_missing";
   }
 
-  const apartment = readOptionalText(input, "apartment");
+  const apartment = readNumberedText(input, "apartment");
 
   if (!apartment.ok) {
     return "delivery_optional_not_string";

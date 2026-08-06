@@ -670,11 +670,25 @@ describe("parseOrder v2 rejections", () => {
     expectReject({ delivery }, "delivery_field_missing");
   });
 
-  it("rejects a non-string apartment", () => {
-    expectReject(
-      { delivery: buildDeliveryCourier({ apartment: 42 }) },
-      "delivery_optional_not_string"
-    );
+  it("rejects an apartment that is neither text nor a whole number", () => {
+    for (const apartment of [1.5, -1, {}, [], true, Number.NaN]) {
+      expectReject(
+        { delivery: buildDeliveryCourier({ apartment }) },
+        "delivery_optional_not_string"
+      );
+    }
+  });
+
+  it("accepts an apartment sent as a whole number, like a warehouse number", () => {
+    const payload = decodeV2({
+      delivery: buildDeliveryCourier({ apartment: 12 }),
+    });
+
+    expect(payload).toBeDefined();
+
+    if (payload?.delivery.mode === "np_courier") {
+      expect(payload.delivery.apartment).toBe("12");
+    }
   });
 
   it("rejects a non-string state", () => {
@@ -940,50 +954,125 @@ describe("the reject reason set", () => {
     "comment_not_string",
   ]);
 
-  const HOSTILE_BODIES: readonly unknown[] = [
-    "string",
-    42,
+  const HOSTILE_VALUES: readonly unknown[] = [
+    undefined,
     null,
-    ["a"],
-    buildOrderV2({ version: "2" }),
-    buildOrderV2({ version: null }),
-    buildOrderV2({ customer: "x" }),
-    buildOrderV2({ customer: buildCustomerV2({ first_name: "   " }) }),
-    buildOrderV2({ customer: buildCustomerV2({ patronymic: 42 }) }),
-    buildOrderV2({ customer: buildCustomerV2({ contact_channel: {} }) }),
-    buildOrderV2({ delivery: [] }),
-    buildOrderV2({ delivery: { mode: "np_dropship" } }),
-    buildOrderV2({ delivery: buildDeliveryBranch({ warehouse: " " }) }),
-    buildOrderV2({ delivery: buildDeliveryBranch({ source: 42 }) }),
-    buildOrderV2({ delivery: buildDeliveryCourier({ apartment: 42 }) }),
-    buildOrderV2({ delivery: buildDeliveryGeneric({ state: [] }) }),
-    buildOrderV2({ comment: 42 }),
-    buildOrderV2({ locale: 42 }),
-    buildOrderV2({ total: "1e3" }),
-    buildOrderV2({ currency: "ua" }),
-    buildOrderV2({ cart: {} }),
-    buildOrderV2({ cart: [] }),
-    buildOrderV2({ cart: [{ title: "x", quantity: "2", productUrl: "u" }] }),
+    "",
+    "   ",
+    0,
+    -1,
+    1.5,
+    42,
+    true,
+    false,
+    {},
+    [],
+    ["x"],
+    { nested: 1 },
+    "\u0000",
+    "x".repeat(500),
   ];
+
+  const TOP_KEYS: readonly string[] = [
+    "version",
+    "idempotency_key",
+    "locale",
+    "customer",
+    "delivery",
+    "comment",
+    "cart",
+    "total",
+    "currency",
+    "additional",
+    "unknown_future_key",
+  ];
+
+  const CUSTOMER_KEYS: readonly string[] = [
+    "first_name",
+    "last_name",
+    "patronymic",
+    "phone",
+    "contact_channel",
+    "unknown_future_key",
+  ];
+
+  const DELIVERY_BUILDERS: readonly ((
+    overrides: Record<string, unknown>
+  ) => Record<string, unknown>)[] = [
+    buildDeliveryBranch,
+    buildDeliveryPostomat,
+    buildDeliveryCourier,
+    buildDeliveryGeneric,
+  ];
+
+  const DELIVERY_KEYS: readonly string[] = [
+    "mode",
+    "source",
+    "city",
+    "warehouse",
+    "warehouse_number",
+    "street",
+    "building",
+    "apartment",
+    "country",
+    "state",
+    "unknown_future_key",
+  ];
+
+  const bodies = (): readonly unknown[] => {
+    const out: unknown[] = ["string", 42, null, undefined, ["a"], {}];
+
+    for (const key of TOP_KEYS) {
+      for (const value of HOSTILE_VALUES) {
+        out.push(buildOrderV2({ [key]: value }));
+      }
+    }
+
+    for (const key of CUSTOMER_KEYS) {
+      for (const value of HOSTILE_VALUES) {
+        out.push(buildOrderV2({ customer: buildCustomerV2({ [key]: value }) }));
+      }
+    }
+
+    for (const build of DELIVERY_BUILDERS) {
+      for (const key of DELIVERY_KEYS) {
+        for (const value of HOSTILE_VALUES) {
+          out.push(buildOrderV2({ delivery: build({ [key]: value }) }));
+        }
+      }
+    }
+
+    for (const value of HOSTILE_VALUES) {
+      out.push(
+        buildOrderV2({ cart: [{ ...buildCartItem(), quantity: value }] })
+      );
+      out.push(buildOrderV2({ cart: [value] }));
+    }
+
+    return out;
+  };
 
   it("never produces a reason outside the declared union", () => {
     const seen = new Set<string>();
+    let rejected = 0;
 
-    for (const body of HOSTILE_BODIES) {
+    for (const body of bodies()) {
       const result = parseOrder(body);
 
       if (!result.ok) {
+        rejected += 1;
         seen.add(result.reason);
         expect(DECLARED_REASONS.has(result.reason)).toBe(true);
       }
     }
 
+    expect(rejected).toBeGreaterThan(100);
     expect(seen.size).toBeGreaterThan(10);
   });
 
-  it("rejects every hostile body in the matrix", () => {
-    for (const body of HOSTILE_BODIES) {
-      expect(parseOrder(body).ok).toBe(false);
+  it("never throws, whatever the body carries", () => {
+    for (const body of bodies()) {
+      expect(() => parseOrder(body)).not.toThrow();
     }
   });
 });

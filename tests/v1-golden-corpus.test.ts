@@ -146,3 +146,36 @@ describe("the v1 golden corpus captured from master", () => {
     });
   }
 });
+
+describe("the one deliberate divergence from master on the v1 path", () => {
+  const SEPARATORS: readonly string[] = [
+    "\r",
+    "\v",
+    "\f",
+    "\u0085",
+    "\u2028",
+    "\u2029",
+  ];
+
+  const FORBIDDEN = /[\r\v\f\u0085\u2028\u2029]/u;
+
+  it("collapses the line separators master let through a v1 field", () => {
+    for (const separator of SEPARATORS) {
+      const input = {
+        ...corpus.entries[0]?.input,
+        address: `Шевченка${separator}12`,
+      };
+
+      const message = renderThroughV1(input);
+
+      expect(message).not.toMatch(FORBIDDEN);
+      expect(message).toContain("Шевченка 12");
+    }
+  });
+
+  it("leaves every corpus fixture byte-identical all the same", () => {
+    for (const entry of corpus.entries) {
+      expect(renderThroughV1(entry.input)).toBe(entry.message);
+    }
+  });
+});
