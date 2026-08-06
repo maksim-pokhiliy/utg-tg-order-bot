@@ -99,7 +99,7 @@ describe("payload contract", () => {
   });
 
   it("pins the key sets against accidental growth", () => {
-    expect(ORDER_PAYLOAD_KEYS).toHaveLength(12);
+    expect(ORDER_PAYLOAD_KEYS).toHaveLength(13);
     expect(CART_ITEM_KEYS).toHaveLength(3);
   });
 });

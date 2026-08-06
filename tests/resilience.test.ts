@@ -195,8 +195,8 @@ describe("the handler boundary", () => {
 
     stubTelegram();
     vi.resetModules();
-    vi.doMock("../src/message.js", () => ({
-      buildOrderMessage: (): string => {
+    vi.doMock("../src/messageV2.js", () => ({
+      renderOrder: (): string => {
         throw new RangeError("simulated invariant break");
       },
     }));
@@ -215,7 +215,7 @@ describe("the handler boundary", () => {
       expect(logged).toContain("RangeError");
       expect(logged).not.toContain("simulated invariant break");
     } finally {
-      vi.doUnmock("../src/message.js");
+      vi.doUnmock("../src/messageV2.js");
       vi.resetModules();
     }
   });

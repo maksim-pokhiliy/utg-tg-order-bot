@@ -1,6 +1,6 @@
 import { isAuthorized } from "../src/auth.js";
-import { buildOrderMessage } from "../src/message.js";
-import { parseOrderPayload } from "../src/payload.js";
+import { renderOrder } from "../src/messageV2.js";
+import { parseOrder } from "../src/payloadV2.js";
 import { sendOrderMessage } from "../src/telegram.js";
 
 const SUCCESS_BODY = { status: "success" };
@@ -28,7 +28,7 @@ const relay = async (request: Request): Promise<Response> => {
     return failure(HTTP_UNAUTHORIZED);
   }
 
-  const parsed = parseOrderPayload(await readBody(request));
+  const parsed = parseOrder(await readBody(request));
 
   if (!parsed.ok) {
     console.warn(
@@ -38,7 +38,7 @@ const relay = async (request: Request): Promise<Response> => {
     return failure(HTTP_BAD_REQUEST);
   }
 
-  const sent = await sendOrderMessage(buildOrderMessage(parsed.value));
+  const sent = await sendOrderMessage(renderOrder(parsed.value));
 
   return sent.ok ? Response.json(SUCCESS_BODY) : failure(HTTP_SERVER_ERROR);
 };
