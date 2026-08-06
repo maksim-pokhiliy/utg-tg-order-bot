@@ -4,8 +4,12 @@ import { POST } from "../api/place_order.js";
 import {
   BOT_TOKEN,
   BrokenBodyRequest,
+  buildDeliveryCourier,
+  buildDeliveryGeneric,
   buildOrder,
+  buildOrderV2,
   CHAT_ID,
+  JsonBodyRequest,
   StubRequest,
   TELEGRAM_URL,
 } from "./support/orderPayload.js";
@@ -174,5 +178,209 @@ describe("POST /api/place_order", () => {
     expect(logged).toContain("total_not_plain_decimal");
     expect(logged).not.toContain("1e3");
     expect(logged).not.toContain("Олександр");
+  });
+});
+
+describe("POST /api/place_order with a v2 envelope", () => {
+  it("relays a v2 order and answers 200 with the frozen success body", async () => {
+    const fetchStub = stubTelegram();
+
+    const response = await POST(new StubRequest(buildOrderV2()));
+
+    expect(response.status).toBe(200);
+    await expect(readJson(response)).resolves.toEqual({ status: "success" });
+
+    const sent = readSentMessage(fetchStub);
+
+    expect(sent.url).toBe(TELEGRAM_URL);
+    expect(sent.parseMode).toBe("HTML");
+    expect(sent.text).toContain("👤 <b>First Name:</b> Марія");
+    expect(sent.text).toContain("🚚 <b>Delivery:</b> Nova Poshta branch");
+    expect(sent.text).toContain("🏤 <b>Warehouse:</b>");
+  });
+
+  it("parses a genuinely serialised v2 body off the wire", async () => {
+    const fetchStub = stubTelegram();
+
+    const response = await POST(new JsonBodyRequest(buildOrderV2()));
+
+    expect(response.status).toBe(200);
+    expect(readSentMessage(fetchStub).text).toContain(
+      "🔎 <b>Address Source:</b> Nova Poshta directory"
+    );
+  });
+
+  it("keeps serving v1 bodies unchanged while v2 is accepted", async () => {
+    const fetchStub = stubTelegram();
+
+    const response = await POST(new StubRequest(buildOrder()));
+
+    expect(response.status).toBe(200);
+    expect(readSentMessage(fetchStub).text).toContain(
+      "👤 <b>First Name:</b> Олександр"
+    );
+  });
+
+  it("sends a rates-down v2 order in hryvnia and never in dollars", async () => {
+    const fetchStub = stubTelegram();
+
+    await POST(
+      new StubRequest(
+        buildOrderV2({
+          locale: "en",
+          currency: "UAH",
+          delivery: buildDeliveryGeneric(),
+        })
+      )
+    );
+
+    const sent = readSentMessage(fetchStub);
+
+    expect(sent.text).toContain("💲 <b>Total:</b> ₴250.00");
+    expect(sent.text).not.toContain("$");
+  });
+
+  it("rejects a malformed v2 body as v2 and names the real problem", async () => {
+    const logs = captureConsoleWarn();
+    const fetchStub = stubTelegram();
+
+    const response = await POST(
+      new StubRequest(
+        buildOrderV2({ delivery: buildDeliveryCourier({ building: "  " }) })
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(fetchStub).not.toHaveBeenCalled();
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("delivery_building_missing");
+    expect(logged).not.toContain("required_field_missing");
+  });
+
+  it("rejects an unsupported version before either decoder runs", async () => {
+    const logs = captureConsoleWarn();
+
+    const response = await POST(
+      new StubRequest(buildOrderV2({ version: "2" }))
+    );
+
+    expect(response.status).toBe(400);
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("version_unsupported");
+    expect(logged).not.toContain("required_field_missing");
+  });
+
+  it("never echoes a v2 field value into the response or the log", async () => {
+    const logs = captureConsoleWarn();
+    stubTelegram();
+
+    const response = await POST(
+      new StubRequest(buildOrderV2({ total: "1e3" }))
+    );
+
+    const body = await response.text();
+
+    expect(body).toBe(JSON.stringify({ status: "error" }));
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("total_not_plain_decimal");
+
+    for (const secret of [
+      "Марія",
+      "Шевченко",
+      "+380671234567",
+      "Городоцька",
+      "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731",
+      "1e3",
+    ]) {
+      expect(body).not.toContain(secret);
+      expect(logged).not.toContain(secret);
+    }
+  });
+
+  it("never puts the idempotency key in front of an operator", async () => {
+    const fetchStub = stubTelegram();
+
+    await POST(new StubRequest(buildOrderV2()));
+
+    expect(readSentMessage(fetchStub).text).not.toContain(
+      "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731"
+    );
+  });
+});
+
+describe("diagnosing a rejected order in production", () => {
+  it("records the version it observed on every rejection", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    await POST(new StubRequest(buildOrderV2({ total: "1e3" })));
+
+    expect(joinLoggedLines(logs)).toContain('"version":2');
+  });
+
+  it("tells a versionless v2 body apart from a broken v1 one", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    const versionless = buildOrderV2();
+
+    delete versionless["version"];
+
+    const response = await POST(new StubRequest(versionless));
+
+    expect(response.status).toBe(400);
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("required_field_missing");
+    expect(logged).toContain('"version":"absent"');
+  });
+
+  it("names the type of an unusable version rather than its value", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    await POST(new StubRequest(buildOrderV2({ version: "2" })));
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("version_unsupported");
+    expect(logged).toContain('"version":"string"');
+    expect(logged).not.toContain('"version":"2"');
+  });
+
+  it("keeps every payload value out of the rejection log", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    await POST(
+      new StubRequest(
+        buildOrderV2({ delivery: buildDeliveryCourier({ building: "  " }) })
+      )
+    );
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("delivery_building_missing");
+
+    for (const secret of [
+      "Марія",
+      "Шевченко",
+      "+380671234567",
+      "Городоцька",
+      "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731",
+    ]) {
+      expect(logged).not.toContain(secret);
+    }
   });
 });

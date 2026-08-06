@@ -26,7 +26,18 @@ export type RejectReason =
   | "currency_malformed"
   | "cart_not_array"
   | "cart_empty"
-  | "cart_item_malformed";
+  | "cart_item_malformed"
+  | "version_unsupported"
+  | "customer_not_object"
+  | "customer_field_missing"
+  | "delivery_not_object"
+  | "delivery_mode_missing"
+  | "delivery_mode_unknown"
+  | "delivery_city_missing"
+  | "delivery_warehouse_missing"
+  | "delivery_street_missing"
+  | "delivery_building_missing"
+  | "delivery_address_missing";
 
 export interface OrderCartItem {
   title: string;
@@ -47,38 +58,58 @@ export interface OrderPayload extends OrderContact {
 export type ParseResult =
   { ok: true; value: OrderPayload } | { ok: false; reason: RejectReason };
 
+export type OptionalText =
+  { ok: true; value: string | undefined } | { ok: false };
+
 const reject = (reason: RejectReason): ParseResult => ({ ok: false, reason });
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
+export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const isCurrencyCode = (value: unknown): value is string =>
+export const isCurrencyCode = (value: unknown): value is string =>
   typeof value === "string" && CURRENCY_PATTERN.test(value);
 
-const isPlainDecimal = (value: unknown): value is PlainDecimal =>
+export const isPlainDecimal = (value: unknown): value is PlainDecimal =>
   typeof value === "string" &&
   value.length <= MAX_TOTAL_LENGTH &&
   TOTAL_PATTERN.test(value);
 
-const readRequiredText = (
+export const readText = (
   source: Record<string, unknown>,
-  key: RequiredTextKey
+  key: string
 ): string | undefined => {
   const value = source[key];
 
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 };
 
+export const readOptionalText = (
+  source: Record<string, unknown>,
+  key: string
+): OptionalText => {
+  const value = source[key];
+
+  if (value === undefined || value === null) {
+    return { ok: true, value: undefined };
+  }
+
+  if (typeof value !== "string") {
+    return { ok: false };
+  }
+
+  return { ok: true, value: value.trim() === "" ? undefined : value };
+};
+
 const readContact = (
   source: Record<string, unknown>
 ): OrderContact | undefined => {
-  const first_name = readRequiredText(source, "first_name");
-  const last_name = readRequiredText(source, "last_name");
-  const telephone = readRequiredText(source, "telephone");
-  const country = readRequiredText(source, "country");
-  const state = readRequiredText(source, "state");
-  const city = readRequiredText(source, "city");
-  const address = readRequiredText(source, "address");
+  const first_name = readText(source, "first_name");
+  const last_name = readText(source, "last_name");
+  const telephone = readText(source, "telephone");
+  const country = readText(source, "country");
+  const state = readText(source, "state");
+  const city = readText(source, "city");
+  const address = readText(source, "address");
 
   if (
     first_name === undefined ||
@@ -129,7 +160,9 @@ const parseCartItem = (input: unknown): OrderCartItem | undefined => {
   return { title, quantity, productUrl };
 };
 
-const parseCart = (input: unknown): readonly OrderCartItem[] | RejectReason => {
+export const parseCart = (
+  input: unknown
+): readonly OrderCartItem[] | RejectReason => {
   if (!Array.isArray(input)) {
     return "cart_not_array";
   }

@@ -22,15 +22,7 @@ const LOCALE_CURRENCY: ReadonlyMap<string, string> = new Map([
   ["en", "USD"],
 ]);
 
-const buildOmittedMarker = (omitted: number): string =>
-  `${ELLIPSIS} <b>+${String(omitted)} more positions</b>`;
-
-const OMITTED_MARKER_ALLOWANCE =
-  countCodePoints(buildOmittedMarker(0)) +
-  MAX_OMITTED_DIGITS +
-  countCodePoints(ITEM_SEPARATOR);
-
-export function countCodePoints(value: string): number {
+export const countCodePoints = (value: string): number => {
   let total = 0;
 
   for (const _ of value) {
@@ -38,7 +30,15 @@ export function countCodePoints(value: string): number {
   }
 
   return total;
-}
+};
+
+const buildOmittedMarker = (omitted: number): string =>
+  `${ELLIPSIS} <b>+${String(omitted)} more positions</b>`;
+
+const OMITTED_MARKER_ALLOWANCE =
+  countCodePoints(buildOmittedMarker(0)) +
+  MAX_OMITTED_DIGITS +
+  countCodePoints(ITEM_SEPARATOR);
 
 export const escapeHtml = (value: string): string =>
   value
@@ -69,9 +69,9 @@ const field = (value: string, limit: number): string => {
 };
 
 export const collapseNewlines = (value: string): string =>
-  value.replaceAll(/\r?\n/gu, " ");
+  value.replaceAll(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/gu, " ");
 
-const singleLineField = (value: string, limit: number): string =>
+export const singleLineField = (value: string, limit: number): string =>
   field(collapseNewlines(value), limit);
 
 const resolveStyleLocale = (locale: string): string =>
@@ -93,25 +93,48 @@ export const formatTotal = (
     currencyDisplay: "narrowSymbol",
   }).format(total);
 
-const buildHeader = (payload: OrderPayload): string =>
-  [
-    `👤 <b>First Name:</b> ${singleLineField(payload.first_name, CONTACT_FIELD_LIMIT)}`,
-    `🧔 <b>Last Name:</b> ${singleLineField(payload.last_name, CONTACT_FIELD_LIMIT)}`,
-    `📞 <b>Telephone:</b> ${singleLineField(payload.telephone, CONTACT_FIELD_LIMIT)}`,
-    `🌍 <b>Country:</b> ${singleLineField(payload.country, CONTACT_FIELD_LIMIT)}`,
-    `🌍 <b>State:</b> ${singleLineField(payload.state, CONTACT_FIELD_LIMIT)}`,
-    `🌍 <b>City:</b> ${singleLineField(payload.city, CONTACT_FIELD_LIMIT)}`,
-    `🏠 <b>Address:</b> ${singleLineField(payload.address, CONTACT_FIELD_LIMIT)}`,
-    `💲 <b>Total:</b> ${field(
-      formatTotal(payload.total, payload.locale, payload.currency),
-      TOTAL_LIMIT
-    )}`,
-    `📄 <b>Additional Information:</b> ${field(payload.additional, ADDITIONAL_LIMIT)}`,
-    "",
-    PRODUCTS_HEADING,
-    "",
-    LEGACY_LISTING_PREFIX,
-  ].join("\n");
+export const firstNameLine = (value: string): string =>
+  `👤 <b>First Name:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const lastNameLine = (value: string): string =>
+  `🧔 <b>Last Name:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const telephoneLine = (value: string): string =>
+  `📞 <b>Telephone:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const countryLine = (value: string): string =>
+  `🌍 <b>Country:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const stateLine = (value: string): string =>
+  `🌍 <b>State:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const cityLine = (value: string): string =>
+  `🌍 <b>City:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const addressLine = (value: string): string =>
+  `🏠 <b>Address:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const totalLine = (
+  total: PlainDecimal,
+  locale: string,
+  currency: string | undefined
+): string =>
+  `💲 <b>Total:</b> ${field(formatTotal(total, locale, currency), TOTAL_LIMIT)}`;
+
+export const additionalLine = (value: string): string =>
+  `📄 <b>Additional Information:</b> ${field(value, ADDITIONAL_LIMIT)}`;
+
+const buildHeader = (payload: OrderPayload): readonly string[] => [
+  firstNameLine(payload.first_name),
+  lastNameLine(payload.last_name),
+  telephoneLine(payload.telephone),
+  countryLine(payload.country),
+  stateLine(payload.state),
+  cityLine(payload.city),
+  addressLine(payload.address),
+  totalLine(payload.total, payload.locale, payload.currency),
+  additionalLine(payload.additional),
+];
 
 const buildItem = (item: OrderCartItem): string =>
   [
@@ -120,8 +143,18 @@ const buildItem = (item: OrderCartItem): string =>
     `🔗 <b>Product URL:</b> ${singleLineField(item.productUrl, CART_URL_LIMIT)}`,
   ].join("\n");
 
-export const buildOrderMessage = (payload: OrderPayload): string => {
-  const header = buildHeader(payload);
+export const composeMessage = (
+  headerLines: readonly string[],
+  cart: readonly OrderCartItem[]
+): string => {
+  const header = [
+    ...headerLines,
+    "",
+    PRODUCTS_HEADING,
+    "",
+    LEGACY_LISTING_PREFIX,
+  ].join("\n");
+
   const budget =
     MAX_TELEGRAM_TEXT_LENGTH -
     countCodePoints(header) -
@@ -131,7 +164,7 @@ export const buildOrderMessage = (payload: OrderPayload): string => {
   const rendered: string[] = [];
   let used = 0;
 
-  for (const item of payload.cart) {
+  for (const item of cart) {
     const block = buildItem(item);
     const cost =
       countCodePoints(block) + (rendered.length === 0 ? 0 : separatorCost);
@@ -144,7 +177,7 @@ export const buildOrderMessage = (payload: OrderPayload): string => {
     used += cost;
   }
 
-  const omitted = payload.cart.length - rendered.length;
+  const omitted = cart.length - rendered.length;
   const body = rendered.join(ITEM_SEPARATOR);
 
   if (omitted === 0) {
@@ -157,3 +190,6 @@ export const buildOrderMessage = (payload: OrderPayload): string => {
     ? header + marker
     : `${header}${body}${ITEM_SEPARATOR}${marker}`;
 };
+
+export const buildOrderMessage = (payload: OrderPayload): string =>
+  composeMessage(buildHeader(payload), payload.cart);
