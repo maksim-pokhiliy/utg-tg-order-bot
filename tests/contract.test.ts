@@ -12,6 +12,7 @@ import {
 } from "./support/contract.js";
 import {
   BOT_TOKEN,
+  buildCustomerV2,
   buildDeliveryCourier,
   buildDeliveryGeneric,
   buildOrder,
@@ -127,11 +128,18 @@ describe("the v1 payload contract", () => {
     expect(sorted([...item])).toEqual(sorted(CART_ITEM_KEYS));
   });
 
-  it("never reaches for the v2 nested objects", async () => {
-    const { customer, delivery } = await runAndRecord(buildOrder());
+  it("never reaches into v2 nests a v1 body happens to carry", async () => {
+    const { customer, delivery, top } = await runAndRecord(
+      buildOrder({
+        customer: buildCustomerV2(),
+        delivery: buildDeliveryCourier(),
+      })
+    );
 
     expect([...customer]).toEqual([]);
     expect([...delivery]).toEqual([]);
+    expect(top.has("customer")).toBe(false);
+    expect(top.has("delivery")).toBe(false);
   });
 });
 

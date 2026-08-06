@@ -21,6 +21,7 @@ interface CorpusEntry {
 }
 
 interface Corpus {
+  baseline: string;
   commit: string;
   entries: readonly CorpusEntry[];
 }
@@ -56,14 +57,19 @@ const readCorpus = (): Corpus => {
     throw new Error("corpus file is not an object");
   }
 
+  const baseline = parsed["capturedFrom"];
   const commit = parsed["capturedFromCommit"];
   const entries = parsed["entries"];
 
-  if (typeof commit !== "string" || !isList(entries)) {
+  if (
+    typeof baseline !== "string" ||
+    typeof commit !== "string" ||
+    !isList(entries)
+  ) {
     throw new Error("corpus file is malformed");
   }
 
-  return { commit, entries: entries.map(readEntry) };
+  return { baseline, commit, entries: entries.map(readEntry) };
 };
 
 const corpus = readCorpus();
@@ -93,6 +99,22 @@ const renderThroughDispatch = (input: Record<string, unknown>): string => {
 };
 
 describe("the v1 golden corpus captured from master", () => {
+  it("was captured from master, not from this branch", () => {
+    expect(corpus.baseline).toBe("master");
+    expect(corpus.commit).toMatch(COMMIT_PATTERN);
+  });
+
+  it("agrees with the independently written v1 golden message", () => {
+    const distinct = corpus.entries.find(
+      (entry) => entry.name === "distinct-labels"
+    );
+
+    expect(distinct).toBeDefined();
+    expect(distinct?.message).toContain("👤 <b>First Name:</b> FirstNameValue");
+    expect(distinct?.message).toContain(" 🏷️ <b>Title:</b> TitleValue");
+    expect(distinct?.message).toContain("💲 <b>Total:</b> $1,234.50");
+  });
+
   it("carries every fixture the byte-identity gate requires", () => {
     expect(corpus.entries).toHaveLength(EXPECTED_ENTRIES);
     expect(corpus.commit).toMatch(COMMIT_PATTERN);

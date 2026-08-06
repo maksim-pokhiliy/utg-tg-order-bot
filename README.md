@@ -63,9 +63,9 @@ Ukrainian delivery does not fit a flat address string, so v2 nests the recipient
 | `np_branch`     | `city`, `warehouse`, `warehouse_number?`, `source?`   |
 | `np_postomat`   | same as `np_branch`                                   |
 | `np_courier`    | `city`, `street`, `building`, `apartment?`, `source?` |
-| `generic`       | `country`, `state?`, `city`, `address` — no `source`  |
+| `generic`       | `country?`, `state?`, `city`, `address` — no `source` |
 
-The relay requires only what it cannot render an order without: `delivery.mode`, the non-optional fields of the resolved mode, and `customer.first_name` / `last_name` / `phone`. A missing `source`, `warehouse_number` or `contact_channel` costs the operator a hint, never the buyer their order. `contact_channel` is rendered verbatim — the shop pins its own value set, the relay does not second-guess it.
+The relay requires only what it cannot render an order without: `delivery.mode`, `city` plus (`warehouse` \| `street` + `building` \| `address`) for the resolved mode, and `customer.first_name` / `last_name` / `phone` — plus the shape rules `locale`, `total` and a non-empty `cart` inherit from v1. Everything else is optional: a missing `source`, `warehouse_number`, `contact_channel`, `country` or `state` costs the operator a hint, never the buyer their order. `contact_channel` is rendered verbatim — the shop pins its own value set, the relay does not second-guess it.
 
 `source` tells the operator where the address came from: `np_directory` means it was picked out of the carrier's directory, `manual` means it was typed by hand and renders as _verify on the call_. An absent or unrecognised value renders the same warning rather than silence, because assuming an address was verified is the expensive mistake. On a courier order `np_directory` covers the city only — the street is always typed by hand — and the rendered line says so.
 

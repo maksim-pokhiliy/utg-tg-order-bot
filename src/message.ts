@@ -1,9 +1,9 @@
 import type { OrderCartItem, OrderPayload, PlainDecimal } from "./payload.js";
 
 const MAX_TELEGRAM_TEXT_LENGTH = 4096;
-export const CONTACT_FIELD_LIMIT = 200;
-export const ADDITIONAL_LIMIT = 600;
-export const TOTAL_LIMIT = 60;
+const CONTACT_FIELD_LIMIT = 200;
+const ADDITIONAL_LIMIT = 600;
+const TOTAL_LIMIT = 60;
 const QUANTITY_LIMIT = 12;
 const CART_TITLE_LIMIT = 200;
 const CART_URL_LIMIT = 400;
@@ -69,7 +69,7 @@ export const field = (value: string, limit: number): string => {
 };
 
 export const collapseNewlines = (value: string): string =>
-  value.replaceAll(/\r?\n/gu, " ");
+  value.replaceAll(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/gu, " ");
 
 export const singleLineField = (value: string, limit: number): string =>
   field(collapseNewlines(value), limit);
@@ -93,19 +93,47 @@ export const formatTotal = (
     currencyDisplay: "narrowSymbol",
   }).format(total);
 
+export const firstNameLine = (value: string): string =>
+  `👤 <b>First Name:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const lastNameLine = (value: string): string =>
+  `🧔 <b>Last Name:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const telephoneLine = (value: string): string =>
+  `📞 <b>Telephone:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const countryLine = (value: string): string =>
+  `🌍 <b>Country:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const stateLine = (value: string): string =>
+  `🌍 <b>State:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const cityLine = (value: string): string =>
+  `🌍 <b>City:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const addressLine = (value: string): string =>
+  `🏠 <b>Address:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+
+export const totalLine = (
+  total: PlainDecimal,
+  locale: string,
+  currency: string | undefined
+): string =>
+  `💲 <b>Total:</b> ${field(formatTotal(total, locale, currency), TOTAL_LIMIT)}`;
+
+export const additionalLine = (value: string): string =>
+  `📄 <b>Additional Information:</b> ${field(value, ADDITIONAL_LIMIT)}`;
+
 const buildHeader = (payload: OrderPayload): readonly string[] => [
-  `👤 <b>First Name:</b> ${singleLineField(payload.first_name, CONTACT_FIELD_LIMIT)}`,
-  `🧔 <b>Last Name:</b> ${singleLineField(payload.last_name, CONTACT_FIELD_LIMIT)}`,
-  `📞 <b>Telephone:</b> ${singleLineField(payload.telephone, CONTACT_FIELD_LIMIT)}`,
-  `🌍 <b>Country:</b> ${singleLineField(payload.country, CONTACT_FIELD_LIMIT)}`,
-  `🌍 <b>State:</b> ${singleLineField(payload.state, CONTACT_FIELD_LIMIT)}`,
-  `🌍 <b>City:</b> ${singleLineField(payload.city, CONTACT_FIELD_LIMIT)}`,
-  `🏠 <b>Address:</b> ${singleLineField(payload.address, CONTACT_FIELD_LIMIT)}`,
-  `💲 <b>Total:</b> ${field(
-    formatTotal(payload.total, payload.locale, payload.currency),
-    TOTAL_LIMIT
-  )}`,
-  `📄 <b>Additional Information:</b> ${field(payload.additional, ADDITIONAL_LIMIT)}`,
+  firstNameLine(payload.first_name),
+  lastNameLine(payload.last_name),
+  telephoneLine(payload.telephone),
+  countryLine(payload.country),
+  stateLine(payload.state),
+  cityLine(payload.city),
+  addressLine(payload.address),
+  totalLine(payload.total, payload.locale, payload.currency),
+  additionalLine(payload.additional),
 ];
 
 const buildItem = (item: OrderCartItem): string =>

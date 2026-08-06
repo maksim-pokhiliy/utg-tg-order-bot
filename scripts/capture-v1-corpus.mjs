@@ -185,6 +185,11 @@ try {
     `capture-v1-corpus: ${String(entries.length)} entries from ${BASELINE} (${commitOf(BASELINE).slice(0, 7)})`
   );
 } finally {
-  run("git", ["worktree", "remove", "--force", worktree], ROOT);
+  try {
+    run("git", ["worktree", "remove", "--force", worktree], ROOT);
+  } catch {
+    run("git", ["worktree", "prune"], ROOT);
+  }
+
   rmSync(worktree, { recursive: true, force: true });
 }

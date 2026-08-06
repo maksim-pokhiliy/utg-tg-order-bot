@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "smoke": "node scripts/load-smoke.mjs"
+    "smoke": "node scripts/load-smoke.mjs",
+    "capture:v1-corpus": "node scripts/capture-v1-corpus.mjs master"
   },
   "devDependencies": {
     "@types/node": "^24",

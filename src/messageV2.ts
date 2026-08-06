@@ -5,14 +5,18 @@ import type {
   WarehouseMode,
 } from "./delivery.js";
 import {
-  ADDITIONAL_LIMIT,
-  CONTACT_FIELD_LIMIT,
-  TOTAL_LIMIT,
+  additionalLine,
+  addressLine,
   buildOrderMessage,
+  cityLine,
   composeMessage,
-  field,
-  formatTotal,
+  countryLine,
+  firstNameLine,
+  lastNameLine,
   singleLineField,
+  stateLine,
+  telephoneLine,
+  totalLine,
 } from "./message.js";
 import type {
   OrderCustomer,
@@ -48,14 +52,14 @@ const optionalLine = (
   value === undefined ? [] : [`${label} ${singleLineField(value, limit)}`];
 
 const customerLines = (customer: OrderCustomer): readonly string[] => [
-  `👤 <b>First Name:</b> ${singleLineField(customer.first_name, CONTACT_FIELD_LIMIT)}`,
-  `🧔 <b>Last Name:</b> ${singleLineField(customer.last_name, CONTACT_FIELD_LIMIT)}`,
+  firstNameLine(customer.first_name),
+  lastNameLine(customer.last_name),
   ...optionalLine(
     "📛 <b>Patronymic:</b>",
     customer.patronymic,
     PATRONYMIC_LIMIT
   ),
-  `📞 <b>Telephone:</b> ${singleLineField(customer.phone, CONTACT_FIELD_LIMIT)}`,
+  telephoneLine(customer.phone),
   ...optionalLine(
     "💬 <b>Preferred Contact:</b>",
     customer.contact_channel,
@@ -91,10 +95,12 @@ const sourceLines = (delivery: OrderDelivery): readonly string[] =>
 const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
   if (delivery.mode === "generic") {
     return [
-      `🌍 <b>Country:</b> ${singleLineField(delivery.country, DELIVERY_FIELD_LIMIT)}`,
-      ...optionalLine("🌍 <b>State:</b>", delivery.state, DELIVERY_FIELD_LIMIT),
-      `🌍 <b>City:</b> ${singleLineField(delivery.city, DELIVERY_FIELD_LIMIT)}`,
-      `🏠 <b>Address:</b> ${singleLineField(delivery.address, DELIVERY_FIELD_LIMIT)}`,
+      ...(delivery.country === undefined
+        ? []
+        : [countryLine(delivery.country)]),
+      ...(delivery.state === undefined ? [] : [stateLine(delivery.state)]),
+      cityLine(delivery.city),
+      addressLine(delivery.address),
     ];
   }
 
@@ -123,23 +129,18 @@ const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
 };
 
 const commentLines = (comment: string | undefined): readonly string[] =>
-  comment === undefined
-    ? []
-    : [`📄 <b>Additional Information:</b> ${field(comment, ADDITIONAL_LIMIT)}`];
+  comment === undefined ? [] : [additionalLine(comment)];
 
 const buildHeaderV2 = (payload: OrderPayloadV2): readonly string[] => [
   ...customerLines(payload.customer),
   `🚚 <b>Delivery:</b> ${DELIVERY_MODE_LABELS[payload.delivery.mode]}`,
   ...sourceLines(payload.delivery),
   ...deliveryLines(payload.delivery),
-  `💲 <b>Total:</b> ${field(
-    formatTotal(payload.total, payload.locale, payload.currency),
-    TOTAL_LIMIT
-  )}`,
+  totalLine(payload.total, payload.locale, payload.currency),
   ...commentLines(payload.comment),
 ];
 
-export const buildOrderMessageV2 = (payload: OrderPayloadV2): string =>
+const buildOrderMessageV2 = (payload: OrderPayloadV2): string =>
   composeMessage(buildHeaderV2(payload), payload.cart);
 
 export const renderOrder = (envelope: OrderEnvelope): string =>

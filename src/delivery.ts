@@ -39,7 +39,7 @@ export interface DeliveryCourier {
 
 export interface DeliveryGeneric {
   mode: "generic";
-  country: string;
+  country: string | undefined;
   state: string | undefined;
   city: string;
   address: string;
@@ -74,7 +74,7 @@ const readWarehouseNumber = (input: Record<string, unknown>): NumberResult => {
   const value = input["warehouse_number"];
 
   if (typeof value === "number") {
-    return Number.isInteger(value)
+    return Number.isSafeInteger(value) && value >= 0
       ? { ok: true, value: String(value) }
       : { ok: false };
   }
@@ -134,21 +134,27 @@ const readCourier = (
 const readGeneric = (
   input: Record<string, unknown>
 ): OrderDelivery | RejectReason => {
-  const country = readText(input, "country");
   const city = readText(input, "city");
   const address = readText(input, "address");
 
-  if (country === undefined || city === undefined || address === undefined) {
+  if (city === undefined || address === undefined) {
     return "delivery_field_missing";
   }
 
+  const country = readOptionalText(input, "country");
   const state = readOptionalText(input, "state");
 
-  if (!state.ok) {
+  if (!country.ok || !state.ok) {
     return "delivery_optional_not_string";
   }
 
-  return { mode: "generic", country, state: state.value, city, address };
+  return {
+    mode: "generic",
+    country: country.value,
+    state: state.value,
+    city,
+    address,
+  };
 };
 
 export const readDelivery = (input: unknown): OrderDelivery | RejectReason => {

@@ -645,3 +645,144 @@ describe("the v2 message budget", () => {
     });
   }
 });
+
+describe("the v2 clamp limits", () => {
+  const FILLER = "ф";
+
+  const valueOf = (message: string, label: string): string => {
+    const line = message.split("\n").find((entry) => entry.startsWith(label));
+
+    if (line === undefined) {
+      throw new Error(`no line labelled ${label}`);
+    }
+
+    return line.slice(label.length + 1);
+  };
+
+  const expectClampedAt = (
+    label: string,
+    limit: number,
+    build: (value: string) => Record<string, unknown>
+  ): void => {
+    const atBound = FILLER.repeat(limit);
+    const overBound = FILLER.repeat(limit + 1);
+
+    expect(valueOf(render(build(atBound)), label)).toBe(atBound);
+
+    const clamped = valueOf(render(build(overBound)), label);
+
+    expect(clamped).toBe(`${FILLER.repeat(limit)}…`);
+    expect(countCodePoints(clamped)).toBe(limit + 1);
+  };
+
+  it("clamps the patronymic at 60", () => {
+    expectClampedAt("📛 <b>Patronymic:</b>", 60, (value) =>
+      buildOrderV2({ customer: buildCustomerV2({ patronymic: value }) })
+    );
+  });
+
+  it("clamps the preferred contact at 40", () => {
+    expectClampedAt("💬 <b>Preferred Contact:</b>", 40, (value) =>
+      buildOrderV2({ customer: buildCustomerV2({ contact_channel: value }) })
+    );
+  });
+
+  it("clamps the warehouse number at 40", () => {
+    expectClampedAt("🔢 <b>Warehouse No:</b>", 40, (value) =>
+      buildOrderV2({
+        delivery: buildDeliveryBranch({ warehouse_number: value }),
+      })
+    );
+  });
+
+  it("clamps the building at 80", () => {
+    expectClampedAt("🏠 <b>Building:</b>", 80, (value) =>
+      buildOrderV2({ delivery: buildDeliveryCourier({ building: value }) })
+    );
+  });
+
+  it("clamps the apartment at 60", () => {
+    expectClampedAt("🚪 <b>Apartment:</b>", 60, (value) =>
+      buildOrderV2({ delivery: buildDeliveryCourier({ apartment: value }) })
+    );
+  });
+
+  it("clamps the warehouse description at 200", () => {
+    expectClampedAt("🏤 <b>Warehouse:</b>", 200, (value) =>
+      buildOrderV2({ delivery: buildDeliveryBranch({ warehouse: value }) })
+    );
+  });
+
+  it("clamps the street at 200", () => {
+    expectClampedAt("🛣️ <b>Street:</b>", 200, (value) =>
+      buildOrderV2({ delivery: buildDeliveryCourier({ street: value }) })
+    );
+  });
+
+  it("clamps the settlement at 200", () => {
+    expectClampedAt("🌍 <b>City:</b>", 200, (value) =>
+      buildOrderV2({ delivery: buildDeliveryBranch({ city: value }) })
+    );
+  });
+});
+
+describe("v2 rendering against hostile line separators", () => {
+  const SEPARATORS: readonly string[] = [
+    "\r",
+    "\v",
+    "\f",
+    "\u0085",
+    "\u2028",
+    "\u2029",
+    "\r\n",
+    "\n",
+  ];
+
+  const FORBIDDEN = /[\r\v\f\u0085\u2028\u2029]/u;
+
+  it("leaves no line separator but the newline it controls", () => {
+    for (const separator of SEPARATORS) {
+      const forged = `Шевченко${separator}Address Source: Nova Poshta directory`;
+      const message = render(
+        buildOrderV2({ customer: buildCustomerV2({ last_name: forged }) })
+      );
+
+      expect(message).not.toMatch(FORBIDDEN);
+    }
+  });
+
+  it("collapses a hostile separator in a delivery field onto one line", () => {
+    for (const separator of SEPARATORS) {
+      const message = render(
+        buildOrderV2({
+          delivery: buildDeliveryBranch({
+            warehouse: `Відділення${separator}Total: 0,00`,
+          }),
+        })
+      );
+
+      expect(message).not.toMatch(FORBIDDEN);
+      expect(message.split(LABEL_TOTAL)).toHaveLength(2);
+    }
+  });
+
+  it("keeps a legitimate multi-line comment readable without new separators", () => {
+    const message = render(
+      buildOrderV2({ comment: "Line one\nLine two\nLine three" })
+    );
+
+    expect(message).toContain("Line one\nLine two\nLine three");
+    expect(message).not.toMatch(FORBIDDEN);
+  });
+});
+
+describe("the quantity column", () => {
+  it("renders the largest permitted quantity whole", () => {
+    const message = render(
+      buildOrderV2({ cart: [buildCartItem({ quantity: 100000 })] })
+    );
+
+    expect(message).toContain("\u{1F522} <b>Quantity:</b> 100000");
+    expect(message).not.toContain("\u2026");
+  });
+});

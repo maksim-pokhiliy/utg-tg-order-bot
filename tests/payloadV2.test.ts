@@ -654,10 +654,18 @@ describe("parseOrder v2 rejections", () => {
     expectReject({ delivery }, "delivery_field_missing");
   });
 
-  it("rejects a generic address with no country", () => {
+  it("rejects a generic address with no city", () => {
     const delivery = buildDeliveryGeneric();
 
-    delete delivery["country"];
+    delete delivery["city"];
+
+    expectReject({ delivery }, "delivery_field_missing");
+  });
+
+  it("rejects a generic address with no address line", () => {
+    const delivery = buildDeliveryGeneric();
+
+    delete delivery["address"];
 
     expectReject({ delivery }, "delivery_field_missing");
   });
@@ -904,6 +912,78 @@ describe("parseOrderPayloadV2", () => {
 
     if (!result.ok) {
       expect(result.reason).toBe("customer_not_object");
+    }
+  });
+});
+
+describe("the reject reason set", () => {
+  const DECLARED_REASONS: ReadonlySet<string> = new Set([
+    "body_not_object",
+    "required_field_missing",
+    "additional_not_string",
+    "locale_not_string",
+    "total_not_plain_decimal",
+    "currency_malformed",
+    "cart_not_array",
+    "cart_empty",
+    "cart_item_malformed",
+    "version_unsupported",
+    "customer_not_object",
+    "customer_field_missing",
+    "patronymic_not_string",
+    "contact_channel_not_string",
+    "delivery_not_object",
+    "delivery_mode_unknown",
+    "delivery_field_missing",
+    "delivery_optional_not_string",
+    "delivery_source_not_string",
+    "comment_not_string",
+  ]);
+
+  const HOSTILE_BODIES: readonly unknown[] = [
+    "string",
+    42,
+    null,
+    ["a"],
+    buildOrderV2({ version: "2" }),
+    buildOrderV2({ version: null }),
+    buildOrderV2({ customer: "x" }),
+    buildOrderV2({ customer: buildCustomerV2({ first_name: "   " }) }),
+    buildOrderV2({ customer: buildCustomerV2({ patronymic: 42 }) }),
+    buildOrderV2({ customer: buildCustomerV2({ contact_channel: {} }) }),
+    buildOrderV2({ delivery: [] }),
+    buildOrderV2({ delivery: { mode: "np_dropship" } }),
+    buildOrderV2({ delivery: buildDeliveryBranch({ warehouse: " " }) }),
+    buildOrderV2({ delivery: buildDeliveryBranch({ source: 42 }) }),
+    buildOrderV2({ delivery: buildDeliveryCourier({ apartment: 42 }) }),
+    buildOrderV2({ delivery: buildDeliveryGeneric({ state: [] }) }),
+    buildOrderV2({ comment: 42 }),
+    buildOrderV2({ locale: 42 }),
+    buildOrderV2({ total: "1e3" }),
+    buildOrderV2({ currency: "ua" }),
+    buildOrderV2({ cart: {} }),
+    buildOrderV2({ cart: [] }),
+    buildOrderV2({ cart: [{ title: "x", quantity: "2", productUrl: "u" }] }),
+  ];
+
+  it("never produces a reason outside the declared union", () => {
+    const seen = new Set<string>();
+
+    for (const body of HOSTILE_BODIES) {
+      const result = parseOrder(body);
+
+      if (!result.ok) {
+        seen.add(result.reason);
+        expect(DECLARED_REASONS.has(result.reason)).toBe(true);
+      }
+    }
+
+    expect(seen.size).toBeGreaterThan(10);
+  });
+
+  it("rejects every hostile body in the matrix", () => {
+    for (const body of HOSTILE_BODIES) {
+      expect(parseOrder(body).ok).toBe(false);
     }
   });
 });
