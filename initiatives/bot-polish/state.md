@@ -11,45 +11,37 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 | --- | ---------------------------------------------------------------- | --------------------------------------------- | -------------------------------- |
 | B1  | Relay rewrite (currency read, injection fix, validation, floor) | ✅ shipped — merged `2a1dea3`, prod-smoked    | journal 2026-08-03               |
 | B2  | Shop-side secret sender + env enablement                        | ✅ shipped — shop PR #20 `bb3f866`, enforcement live and verified | shop journal 2026-08-06 |
-| B3  | Relay dual-accepts v1 + v2 payloads (gates the shop's U5a)      | 🔄 executor round open                        | `step-b3-dual-accept-prompt.md` · shop §5 |
-| B4  | Orders persisted to Postgres before the Telegram send           | ⬜ pending                                    | shop D-11 · `deferred.md` BDEF-3      |
+| B3  | Relay dual-accepts v1 + v2 payloads                             | ✅ shipped — PR #2 `66134ee`, both paths prod-smoked | journal 2026-08-06 |
+| B4  | Message-width truth: UTF-16 budget + misleading characters      | ⬜ NEXT — gates the shop's U5a merge          | `deferred.md` BDEF-4 / BDEF-5         |
+| B5  | Orders persisted to Postgres before the Telegram send           | ⬜ pending                                    | shop D-11 · `deferred.md` BDEF-3      |
 
 ## Next action
 
-**B3 executor round is OPEN.** After it: **B4 — orders become durable** (owner
-ratified 2026-08-06 as shop-side D-11). Today a delivered order is durable NOWHERE:
-its only trace is a Telegram message, and one operators' chat has already died taking
-its history with it; a failed send evaporates the order with no replay path. B4 writes
-each decoded order to Postgres (Neon, the owner's paid plan) BEFORE the send, keyed by
-the new optional `idempotency_key` the shop mints — which also closes BDEF-3 nearly for
-free. **Absolute design rule: the store must never gate the Telegram send.** A database
-that is down costs an audit row, never an order.
+**B4 — message-width truth, and it now GATES the shop's U5a merge.** The B3 review
+quantified the pre-existing BDEF-4 defect against the NEW code: a v2 free-form order
+reaches **7150 UTF-16 units at 3830 code points — +74% over Telegram's real 4096 limit**,
+a materially wider radius than v1 ever had. Our truncation counts code points; Telegram
+counts UTF-16. So an emoji-heavy comment passes our budget, Telegram answers 400, the
+relay surfaces 500, and the order is LOST. v2 stays dormant until the shop's U5a ships
+it — which is exactly why this lands first. B4 also closes BDEF-5 (bidi, zero-width and
+math-bold characters that mislead an operator: a warehouse label can render its digits
+reversed, and a comment line can imitate the genuine Address Source line above it).
+Both fixes change v1 truncation, so B4 re-cuts the golden corpus DELIBERATELY — that is
+the step's job, not a regression to defend against.
 
-The B3 step itself — the relay learns to accept the v2 order envelope
-alongside v1 and render each delivery mode. The shape is shop-side canon:
-`../utg-2.0/initiatives/ua-checkout/requirements.md` §5 (ratified as D-3 there), and
-the rollout order is D-9: bot dual-accepts first, THEN the shop flips its payload
-(its step U5a), then a later follow-up drops v1 here. **Until B3 ships, the shop
-cannot change a single checkout field** — so this step is the critical path for the
-whole ua-checkout initiative, not a side quest.
+Then **B5** — persistence (shop D-11): every decoded order written to Postgres before
+the send, keyed by `idempotency_key`, closing BDEF-3. Reordered behind B4 deliberately:
+persistence makes a lost order recoverable, but not losing it is better.
 
-B2 is CLOSED (2026-08-06): the shop sends `x-relay-secret` (PR #20 `bb3f866`),
-`ORDER_RELAY_SECRET` is set on both Vercel projects as Sensitive/Production, and the
-relay was redeployed to bind it. Verified live without sending anything to the
-operators' chat: 401 with no header and with a wrong header, 400 with the correct one,
-and an authenticated probe routed through the prod shop came back 400 rather than 401.
-BDEF-1 closed here, DEF-13 closed in the shop ledger.
-
-**Operational lesson from the B2 rollout, worth more than the step itself:** a Vercel
-env var binds only to the NEXT deployment, and `vercel redeploy` must target the
-deployment ACTUALLY serving production, resolved by id from its logs (`branch=master`).
-Redeploying the first URL in `vercel ls --prod` landed on a pre-B1 legacy build and
-500'd every order for ~3 minutes until `vercel promote` restored it (no real order was
-lost — six hours of runtime logs show only the planner's own probes and zero 200s).
+B3 is CLOSED (2026-08-06, PR #2 `66134ee`). `version` 2 selects v2, absent or 1 selects
+v1, anything else is an honest `version_unsupported`; unknown KEYS are ignored at every
+level, so future additive contract fields can never be breaking. Prod-smoked after the
+merge: auth still 401s header-less callers, both decoders answer, and **both a v1 and a
+v2 order were delivered live to the operators' chat** (TEST-labeled, 200/200) — v1 is
+what the live shop sends today, so proving it still delivers was the whole point.
 
 Owner side-items, non-blocking: rotate the bot token (it crossed a terminal in clear
-text during the B1 incident — BotFather revoke + env update + redeploy), delete the
-stale local `feat/relay-rewrite` branch.
+text during the B1 incident), delete stale local branches.
 
 ## Open decisions awaiting ratification
 

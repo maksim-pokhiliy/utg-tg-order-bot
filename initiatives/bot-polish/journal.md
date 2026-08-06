@@ -274,3 +274,56 @@ Append-only. One entry per session/step.
   the critical path: the shop cannot change a checkout field until it lands. Decide
   BDEF-3 (idempotency key) there — B3 is the contract window, and the shop must send
   the key if it exists.
+
+## 2026-08-06 — B3 closed: the relay dual-accepts v2; B4 inserted ahead of persistence
+
+- PR #2 (`66134ee`) merged. The relay accepts the shop's v2 envelope alongside v1:
+  `version` 2 selects v2, absent or 1 selects v1, anything else answers an honest
+  `version_unsupported` rather than falling into the v1 decoder and blaming seven
+  flat fields it never had. Unknown KEYS are ignored at every level, so future
+  additive contract fields can never be breaking — that rule is now the load-bearing
+  one for the whole shop-side roadmap. 97 tests → 285.
+- **How v1 byte-identity was proven**, and it is worth reusing: a golden corpus of 12
+  messages was rendered by MASTER-COMPILED code in a separate worktree and committed
+  as the FIRST commit of the branch, before a single source file changed — so the
+  baseline could not be fitted to the new code. Two independent confirmations
+  followed: a re-render of all 12 fixtures with master's code (12/12), and a
+  differential fuzz of 80,000 generated v1 orders master vs branch with **zero
+  unexplained divergences**.
+- Plan-gate rulings (planner): §3 governs which fields the relay may REQUIRE while §5
+  governs shape — the relay must not reject on a missing `source`,
+  `warehouse_number` or `contact_channel`; `contact_channel` takes any non-empty
+  string, verbatim; `warehouse_number` accepts a string or an integer; no
+  cross-validation of `locale` against `delivery.mode` (that rule would reject every
+  real order during the shop's U5a window, where `generic` ships under `uk` by
+  design). The gate also caught a genuine contradiction between §3 and §5 in the
+  shop's own spec, which was fixed at the source rather than answered here.
+- **The independent deep review (72 pre-cap candidates → 10 findings) hit the step's
+  own argument three times**, and all three were fixed:
+  1. The byte-identity gate was blind in a ~120 code-point band — the message budget
+     could be cut from 4096 to 3990 with the whole battery green, silently dropping
+     order lines. Eight limit mutations survived. Boundary fixtures now sit exactly
+     on each shared clamp; a ±1 mutation reddens, verified by the planner personally.
+  2. Style-only v2 fields failed CLOSED on a wrong TYPE, contradicting this repo's own
+     ratified BD-9 — `contact_channel: {label, value}` (a routine single-select bug,
+     and exactly what the shop is about to write) killed the whole order. They now
+     degrade to absent, matching how `idempotency_key` already behaved: two fields of
+     identical contract status had opposite handling in one file.
+  3. The corpus provenance assertion was vacuous — it compared a hardcoded string, so
+     regenerating from REGRESSED code passed 270/270. The capture commit is now a
+     literal in the test: a re-baseline requires editing a checked-in constant.
+- Deferred with reasons, not silently: BDEF-6 (structural tails — the v1 path routing
+  through `*V2` modules and ~16 duplicated validation lines; they dissolve as a side
+  effect when v1 is dropped), and the BDEF-5 scope widened to include Unicode
+  math-bold after the review proved the "genuine bold line" is not a forgery guard.
+  The docs that claimed otherwise were corrected in the same round.
+- **Sequencing changed on evidence.** The review quantified BDEF-4 against the new
+  code: a v2 free-form order reaches 7150 UTF-16 units at 3830 code points, +74% over
+  Telegram's real limit and a wider radius than v1 ever had. So **B4 is now the
+  width/character-truth step and gates the shop's U5a merge**, and persistence moves
+  to B5. Not losing an order beats recovering it.
+- Prod-smoked after the merge by the planner: 401 without the relay secret, both
+  decoders answering, and **both a v1 and a v2 order delivered live** to the
+  operators' chat (TEST-labeled, 200/200). v1 is what the live shop sends today, so
+  proving it still delivers end to end was the point — byte-identical rendering does
+  not prove a deployed function works.
