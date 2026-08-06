@@ -232,3 +232,45 @@ Append-only. One entry per session/step.
   state", `ORDER_RELAY_SECRET` "lands in B1"), DEF-13 progress note promoted to the
   shop ledger (closure itself stays on B2), and the shop's stranded `dfca818` docs
   commit — left unpushed by the freeze — pushed along with it.
+
+## 2026-08-06 — B2 closed: the relay authenticates; B3 opened as the initiative's critical path
+
+- B2's code half shipped in the shop repo as ua-checkout step U0 (PR #20 `bb3f866`,
+  three review rounds, 611 units). The relay side needed no code — B1's
+  enforcement-if-configured was already waiting.
+- Rollout executed end to end: `ORDER_RELAY_SECRET` generated server-side and set on
+  BOTH Vercel projects as Sensitive/Production, shop first (bound by the merge deploy),
+  relay second. **BD-4's order held**, with one correction learned the hard way: setting
+  an env var does not enable it — Vercel binds env only to the NEXT deployment, so each
+  project needs a redeploy.
+- Verified live **without sending anything to the operators' chat**: the relay answers
+  401 with no header and with a wrong header, and 400 with the correct one (validation
+  reached ⇒ auth passed); then an invalid probe payload POSTed to the PROD shop route
+  came back 400, not 401 — proving the shop's own header is accepted, while the payload
+  died at validation before Telegram was ever touched.
+- **Incident (planner error, ~3 min, no customer impact).** Activating the relay env, the
+  planner ran `vercel redeploy` against the first URL in `vercel ls --prod`, assuming
+  newest-first. It was a pre-B1 legacy build: the alias moved to the old Express
+  implementation and every `POST /place_order` answered 500 (`Legacy server listening…`,
+  `Cannot read properties of undefined (reading 'map')`). Restored with `vercel promote`
+  to `dpl_FhXuNF…`; the correct redeploy then activated enforcement. Runtime logs
+  grouped by status over six hours show exactly the planner's ten probes and **zero
+  200s** — no real order entered the window. Lesson recorded in `deferred.md` and the
+  board: resolve the production deployment by id from its logs (`branch=master`), never
+  by list position.
+- **BD-5's premise retired**: `PLACE_ORDER_URL` is no longer unknown — it is the bare
+  deployment URL (no custom domain, no trailing slash, 405 with zero redirects), and
+  `vercel.json` rewrites `/place_order` to the `api/` function, so this was always one
+  guarded function reached two ways. The decision stands as insurance.
+- Shop-side hardening that protects this relay too, from the same PR: the shop refuses
+  redirects on the relay fetch (a followed cross-origin 307 hands hop two both the
+  secret and the customer's whole order), guards the secret as a legal header value
+  (otherwise `fetch` throws the secret into the logs and every order 500s), and strips
+  trailing slashes off the relay origin (Vercel 308-normalizes `//path` before app code
+  runs — under the redirect refusal that would be a total outage).
+- **BDEF-1 CLOSED** here; **DEF-13 CLOSED** in the shop ledger (its condition was the B1
+  smoke plus this promotion).
+- Next: **B3** — dual-accept v1 + v2 (shop `requirements.md` §5, shop D-3/D-9). It is
+  the critical path: the shop cannot change a checkout field until it lands. Decide
+  BDEF-3 (idempotency key) there — B3 is the contract window, and the shop must send
+  the key if it exists.

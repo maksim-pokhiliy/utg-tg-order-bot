@@ -6,9 +6,19 @@ deterministic pipeline run (data/engine), a design pass (UI). Expect multiple se
 | #   | Step                                                                                                                                                | Mechanism                                           | Gate (how it's accepted)                                                                                                                                       | Status  |
 | --- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | B1  | Relay rewrite: zero-dep TS function, `currency` read (DEF-13), HTML-escaped message, validation, auth-if-configured, tests + CI + README + LICENSE | `/step` → one `/feature` executor run               | Charter acceptance criteria minus the B2 line; PR battery green; planner verification; owner merge; prod deploy verified + TEST-labeled smoke in the real chat | NEXT    |
-| B2  | Shop-side `x-relay-secret` sender + two-project env enablement; close shop `DEF-13` and `BDEF-1`                                                    | `/step` → `/feature small` run in `../utg-2.0`      | Header sent when env present (shop test); envs set in both Vercel projects; header-less POST to prod relay gets 401; real checkout still lands in the chat     | pending |
+| B2  | Shop-side `x-relay-secret` sender + two-project env enablement; close shop `DEF-13` and `BDEF-1`                                                    | `/step` → `/feature small` run in `../utg-2.0`      | Header sent when env present (shop test); envs set in both Vercel projects; header-less POST to prod relay gets 401; real checkout still lands in the chat     | ✅ done (2026-08-06, shop PR #20) |
+| B3  | Relay dual-accepts the v1 and v2 order payloads (shop `requirements.md` §5) and renders each mode's delivery block; contract test pins v2          | `/step` → `/feature` run here                       | v2 order renders in the operators' chat with delivery + contact fields; v1 keeps working byte-identically; both shapes pinned by tests                        | NEXT — gates the shop's U5a |
 
 Open design details deferred to their step: handler shape (classic `(req,res)` vs
 web-standard `Request→Response`) — executor proposes at the B1 plan gate; exact
 validation strictness per field (intent in the step prompt: kills garbage, never breaks
 a benign real order); CI Node wiring detail (`node-version-file` reading `engines`).
+
+**B3 context.** The shop drives the contract: `../utg-2.0/initiatives/ua-checkout/`
+`requirements.md` §5 is the v2 shape (a `version: 2` envelope with `customer{}` and a
+discriminated `delivery.mode` of `np_branch` / `np_postomat` / `np_courier` /
+`generic`), ratified as shop-side D-3, and the rollout order — bot dual-accepts FIRST,
+then the shop flips, then the bot drops v1 — is shop-side D-9. Until B3 is live the shop
+cannot change a single checkout field without either breaking prod ordering or packing
+structured data into legacy strings. Deliberately NOT part of B3: dropping v1 (a later
+follow-up once the shop has flipped).

@@ -81,6 +81,14 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
 - **Rationale.** The live `PLACE_ORDER_URL` value is env-secret and recorded in neither
   repo; serving both paths makes the rewrite deploy-safe with zero coordination and
   keeps the sacred path alive no matter which form the env carries.
+- **Premise retired 2026-08-06 (ua-checkout U0).** The value is no longer unknown: it is
+  `https://telegram-bot-server-maksim-pokhiliys-projects.vercel.app` — the bare
+  deployment URL, no custom domain, no trailing slash, answering 405 with zero redirects
+  on the exact path. The shop appends `/place_order`, so that is the path in use; and
+  `vercel.json` REWRITES it to the `api/` function, meaning this was always one guarded
+  function reached two ways rather than two routes. The decision stands (the redundancy
+  costs nothing), but it is now insurance, not a hedge against ignorance. Recorded in
+  the shop's `ua-checkout/decisions.md` D-10 as well; the URL is public, not a secret.
 
 ### BD-6 — Node pinned to one major via `engines.node: "24.x"`; npm stays
 
