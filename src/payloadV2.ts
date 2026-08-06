@@ -55,6 +55,15 @@ const reject = (reason: RejectReason): OrderParseResult => ({
   reason,
 });
 
+const styleText = (
+  input: Record<string, unknown>,
+  key: string
+): string | undefined => {
+  const text = readOptionalText(input, key);
+
+  return text.ok ? text.value : undefined;
+};
+
 const readCustomer = (input: unknown): OrderCustomer | RejectReason => {
   if (!isRecord(input)) {
     return "customer_not_object";
@@ -72,33 +81,13 @@ const readCustomer = (input: unknown): OrderCustomer | RejectReason => {
     return "customer_field_missing";
   }
 
-  const patronymic = readOptionalText(input, "patronymic");
-
-  if (!patronymic.ok) {
-    return "patronymic_not_string";
-  }
-
-  const contact_channel = readOptionalText(input, "contact_channel");
-
-  if (!contact_channel.ok) {
-    return "contact_channel_not_string";
-  }
-
   return {
     first_name,
     last_name,
-    patronymic: patronymic.value,
+    patronymic: styleText(input, "patronymic"),
     phone,
-    contact_channel: contact_channel.value,
+    contact_channel: styleText(input, "contact_channel"),
   };
-};
-
-const readIdempotencyKey = (
-  input: Record<string, unknown>
-): string | undefined => {
-  const key = readOptionalText(input, "idempotency_key");
-
-  return key.ok ? key.value : undefined;
 };
 
 export const parseOrderPayloadV2 = (
@@ -114,12 +103,6 @@ export const parseOrderPayloadV2 = (
 
   if (typeof delivery === "string") {
     return reject(delivery);
-  }
-
-  const comment = readOptionalText(input, "comment");
-
-  if (!comment.ok) {
-    return reject("comment_not_string");
   }
 
   const { locale, total, currency } = input;
@@ -149,8 +132,8 @@ export const parseOrderPayloadV2 = (
       payload: {
         customer,
         delivery,
-        comment: comment.value,
-        idempotency_key: readIdempotencyKey(input),
+        comment: styleText(input, "comment"),
+        idempotency_key: styleText(input, "idempotency_key"),
         locale,
         total,
         currency,

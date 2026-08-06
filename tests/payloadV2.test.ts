@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { countCodePoints } from "../src/message.js";
+import { renderOrder } from "../src/messageV2.js";
 import { parseOrderPayload, type RejectReason } from "../src/payload.js";
 import {
   parseOrder,
@@ -586,20 +588,6 @@ describe("parseOrder v2 rejections", () => {
     );
   });
 
-  it("rejects a non-string patronymic", () => {
-    expectReject(
-      { customer: buildCustomerV2({ patronymic: 42 }) },
-      "patronymic_not_string"
-    );
-  });
-
-  it("rejects a non-string contact channel", () => {
-    expectReject(
-      { customer: buildCustomerV2({ contact_channel: {} }) },
-      "contact_channel_not_string"
-    );
-  });
-
   it("rejects an order with no delivery", () => {
     const order = buildOrderV2();
 
@@ -619,7 +607,7 @@ describe("parseOrder v2 rejections", () => {
 
     delete delivery["mode"];
 
-    expectReject({ delivery }, "delivery_mode_unknown");
+    expectReject({ delivery }, "delivery_mode_missing");
   });
 
   it("rejects a delivery mode the relay cannot render", () => {
@@ -634,86 +622,178 @@ describe("parseOrder v2 rejections", () => {
   it("rejects a branch with a blank warehouse", () => {
     expectReject(
       { delivery: buildDeliveryBranch({ warehouse: "   " }) },
-      "delivery_field_missing"
+      "delivery_warehouse_missing"
     );
   });
 
-  it("rejects a branch with no city", () => {
-    const delivery = buildDeliveryBranch();
+  it("names the branch field that is missing", () => {
+    const withoutCity = buildDeliveryBranch();
 
-    delete delivery["city"];
+    delete withoutCity["city"];
 
-    expectReject({ delivery }, "delivery_field_missing");
+    expectReject({ delivery: withoutCity }, "delivery_city_missing");
+
+    const withoutWarehouse = buildDeliveryBranch();
+
+    delete withoutWarehouse["warehouse"];
+
+    expectReject({ delivery: withoutWarehouse }, "delivery_warehouse_missing");
   });
 
-  it("rejects a courier address with no building", () => {
-    const delivery = buildDeliveryCourier();
+  it("names the courier field that is missing", () => {
+    const withoutStreet = buildDeliveryCourier();
 
-    delete delivery["building"];
+    delete withoutStreet["street"];
 
-    expectReject({ delivery }, "delivery_field_missing");
+    expectReject({ delivery: withoutStreet }, "delivery_street_missing");
+
+    const withoutBuilding = buildDeliveryCourier();
+
+    delete withoutBuilding["building"];
+
+    expectReject({ delivery: withoutBuilding }, "delivery_building_missing");
   });
 
-  it("rejects a generic address with no city", () => {
-    const delivery = buildDeliveryGeneric();
+  it("names the free-form field that is missing", () => {
+    const withoutCity = buildDeliveryGeneric();
 
-    delete delivery["city"];
+    delete withoutCity["city"];
 
-    expectReject({ delivery }, "delivery_field_missing");
+    expectReject({ delivery: withoutCity }, "delivery_city_missing");
+
+    const withoutAddress = buildDeliveryGeneric();
+
+    delete withoutAddress["address"];
+
+    expectReject({ delivery: withoutAddress }, "delivery_address_missing");
   });
 
-  it("rejects a generic address with no address line", () => {
-    const delivery = buildDeliveryGeneric();
+  it("separates an absent delivery mode from an unrecognised one", () => {
+    const withoutMode = buildDeliveryBranch();
 
-    delete delivery["address"];
+    delete withoutMode["mode"];
 
-    expectReject({ delivery }, "delivery_field_missing");
+    expectReject({ delivery: withoutMode }, "delivery_mode_missing");
+    expectReject(
+      { delivery: buildDeliveryBranch({ mode: null }) },
+      "delivery_mode_missing"
+    );
+    expectReject(
+      { delivery: buildDeliveryBranch({ mode: "np_dropship" }) },
+      "delivery_mode_unknown"
+    );
+    expectReject(
+      { delivery: buildDeliveryBranch({ mode: 42 }) },
+      "delivery_mode_unknown"
+    );
   });
+});
 
-  it("rejects an apartment that is neither text nor a whole number", () => {
-    for (const apartment of [1.5, -1, {}, [], true, Number.NaN]) {
-      expectReject(
-        { delivery: buildDeliveryCourier({ apartment }) },
-        "delivery_optional_not_string"
-      );
+describe("parseOrder v2 style-only fields fail open", () => {
+  it("drops a wrongly typed patronymic instead of losing the order", () => {
+    for (const patronymic of [42, {}, [], true]) {
+      const payload = decodeV2({
+        customer: buildCustomerV2({ patronymic }),
+      });
+
+      expect(payload?.customer.patronymic).toBeUndefined();
     }
   });
 
-  it("accepts an apartment sent as a whole number, like a warehouse number", () => {
+  it("drops a contact channel that arrives as an option object", () => {
     const payload = decodeV2({
-      delivery: buildDeliveryCourier({ apartment: 12 }),
+      customer: buildCustomerV2({
+        contact_channel: { label: "Telegram", value: "telegram" },
+      }),
+    });
+
+    expect(payload).toBeDefined();
+    expect(payload?.customer.contact_channel).toBeUndefined();
+    expect(payload?.customer.phone).toBe("+380671234567");
+  });
+
+  it("drops a wrongly typed comment instead of losing the order", () => {
+    for (const comment of [false, 42, {}, []]) {
+      expect(decodeV2({ comment })?.comment).toBeUndefined();
+    }
+  });
+
+  it("drops a wrongly typed delivery source instead of losing the order", () => {
+    for (const source of [1, {}, [], true]) {
+      const payload = decodeV2({
+        delivery: buildDeliveryBranch({ source }),
+      });
+
+      expect(payload).toBeDefined();
+
+      if (payload?.delivery.mode === "np_branch") {
+        expect(payload.delivery.source).toBeUndefined();
+      }
+    }
+  });
+
+  it("drops a wrongly typed warehouse number instead of losing the order", () => {
+    for (const warehouse_number of [true, [], {}, 1.5, -1, Number.NaN]) {
+      const payload = decodeV2({
+        delivery: buildDeliveryBranch({ warehouse_number }),
+      });
+
+      expect(payload).toBeDefined();
+
+      if (payload?.delivery.mode === "np_branch") {
+        expect(payload.delivery.warehouse_number).toBeUndefined();
+        expect(payload.delivery.warehouse).toBe(
+          "Відділення №1: вул. Городоцька, 359"
+        );
+      }
+    }
+  });
+
+  it("drops a wrongly typed country and state instead of losing the order", () => {
+    const payload = decodeV2({
+      delivery: buildDeliveryGeneric({ country: 1, state: 0 }),
     });
 
     expect(payload).toBeDefined();
 
-    if (payload?.delivery.mode === "np_courier") {
-      expect(payload.delivery.apartment).toBe("12");
+    if (payload?.delivery.mode === "generic") {
+      expect(payload.delivery.country).toBeUndefined();
+      expect(payload.delivery.state).toBeUndefined();
+      expect(payload.delivery.city).toBe("Kraków");
     }
   });
 
-  it("rejects a non-string state", () => {
-    expectReject(
-      { delivery: buildDeliveryGeneric({ state: [] }) },
-      "delivery_optional_not_string"
-    );
+  it("drops a wrongly typed apartment but keeps a whole number", () => {
+    const dropped = decodeV2({
+      delivery: buildDeliveryCourier({ apartment: 1.5 }),
+    });
+
+    if (dropped?.delivery.mode === "np_courier") {
+      expect(dropped.delivery.apartment).toBeUndefined();
+    }
+
+    const kept = decodeV2({
+      delivery: buildDeliveryCourier({ apartment: 12 }),
+    });
+
+    if (kept?.delivery.mode === "np_courier") {
+      expect(kept.delivery.apartment).toBe("12");
+    }
   });
 
-  it("rejects a warehouse number that is neither string nor whole number", () => {
+  it("still fails closed on the integrity set", () => {
+    expectReject({ total: 42 }, "total_not_plain_decimal");
+    expectReject({ currency: 42 }, "currency_malformed");
+    expectReject({ locale: 42 }, "locale_not_string");
+    expectReject({ cart: 42 }, "cart_not_array");
     expectReject(
-      { delivery: buildDeliveryBranch({ warehouse_number: {} }) },
-      "delivery_optional_not_string"
+      { delivery: buildDeliveryBranch({ mode: 42 }) },
+      "delivery_mode_unknown"
     );
-  });
-
-  it("rejects a non-string delivery source", () => {
     expectReject(
-      { delivery: buildDeliveryBranch({ source: 42 }) },
-      "delivery_source_not_string"
+      { customer: buildCustomerV2({ first_name: 42 }) },
+      "customer_field_missing"
     );
-  });
-
-  it("rejects a non-string comment", () => {
-    expectReject({ comment: 42 }, "comment_not_string");
   });
 });
 
@@ -822,13 +902,6 @@ describe("parseOrder v2 tolerance", () => {
     if (payload?.delivery.mode === "np_branch") {
       expect(payload.delivery.warehouse_number).toBe("1");
     }
-  });
-
-  it("rejects a fractional warehouse number", () => {
-    expectReject(
-      { delivery: buildDeliveryBranch({ warehouse_number: 1.5 }) },
-      "delivery_optional_not_string"
-    );
   });
 
   it("accepts a contact channel nobody pinned", () => {
@@ -944,14 +1017,14 @@ describe("the reject reason set", () => {
     "version_unsupported",
     "customer_not_object",
     "customer_field_missing",
-    "patronymic_not_string",
-    "contact_channel_not_string",
     "delivery_not_object",
+    "delivery_mode_missing",
     "delivery_mode_unknown",
-    "delivery_field_missing",
-    "delivery_optional_not_string",
-    "delivery_source_not_string",
-    "comment_not_string",
+    "delivery_city_missing",
+    "delivery_warehouse_missing",
+    "delivery_street_missing",
+    "delivery_building_missing",
+    "delivery_address_missing",
   ]);
 
   const HOSTILE_VALUES: readonly unknown[] = [
@@ -1068,6 +1141,26 @@ describe("the reject reason set", () => {
 
     expect(rejected).toBeGreaterThan(100);
     expect(seen.size).toBeGreaterThan(10);
+  });
+
+  it("renders every body it accepts, within the telegram budget", () => {
+    let rendered = 0;
+
+    for (const body of bodies()) {
+      const result = parseOrder(body);
+
+      if (!result.ok) {
+        continue;
+      }
+
+      const message = renderOrder(result.value);
+
+      rendered += 1;
+      expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+      expect(message).toContain("\u{1F6D2} <b>Products:</b>");
+    }
+
+    expect(rendered).toBeGreaterThan(100);
   });
 
   it("never throws, whatever the body carries", () => {

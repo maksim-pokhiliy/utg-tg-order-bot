@@ -11,8 +11,9 @@ import { parseOrder } from "../src/payloadV2.js";
 const CORPUS_PATH = fileURLToPath(
   new URL("./fixtures/v1-golden-corpus.json", import.meta.url)
 );
-const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
 const EXPECTED_ENTRIES = 12;
+const EXPECTED_BASELINE = "master";
+const EXPECTED_COMMIT = "40ca4c5d2cd46cf1eb10e0887399338215534e0a";
 
 interface CorpusEntry {
   name: string;
@@ -99,25 +100,27 @@ const renderThroughDispatch = (input: Record<string, unknown>): string => {
 };
 
 describe("the v1 golden corpus captured from master", () => {
-  it("was captured from master, not from this branch", () => {
-    expect(corpus.baseline).toBe("master");
-    expect(corpus.commit).toMatch(COMMIT_PATTERN);
+  it("is pinned to the exact commit it was captured from", () => {
+    expect(corpus.baseline).toBe(EXPECTED_BASELINE);
+    expect(corpus.commit).toBe(EXPECTED_COMMIT);
   });
 
-  it("agrees with the independently written v1 golden message", () => {
+  it("renders the distinct-label fixture from source, not from the file", () => {
     const distinct = corpus.entries.find(
       (entry) => entry.name === "distinct-labels"
     );
 
     expect(distinct).toBeDefined();
-    expect(distinct?.message).toContain("👤 <b>First Name:</b> FirstNameValue");
-    expect(distinct?.message).toContain(" 🏷️ <b>Title:</b> TitleValue");
-    expect(distinct?.message).toContain("💲 <b>Total:</b> $1,234.50");
+
+    const rendered = renderThroughV1(distinct?.input ?? {});
+
+    expect(rendered).toContain("👤 <b>First Name:</b> FirstNameValue");
+    expect(rendered).toContain(" 🏷️ <b>Title:</b> TitleValue");
+    expect(rendered).toContain("💲 <b>Total:</b> $1,234.50");
   });
 
   it("carries every fixture the byte-identity gate requires", () => {
     expect(corpus.entries).toHaveLength(EXPECTED_ENTRIES);
-    expect(corpus.commit).toMatch(COMMIT_PATTERN);
     expect(corpus.entries.map((entry) => entry.name)).toEqual([
       "canonical-uk",
       "rates-down-en-uah",
@@ -170,12 +173,6 @@ describe("the one deliberate divergence from master on the v1 path", () => {
 
       expect(message).not.toMatch(FORBIDDEN);
       expect(message).toContain("Шевченка 12");
-    }
-  });
-
-  it("leaves every corpus fixture byte-identical all the same", () => {
-    for (const entry of corpus.entries) {
-      expect(renderThroughV1(entry.input)).toBe(entry.message);
     }
   });
 });

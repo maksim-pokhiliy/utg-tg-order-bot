@@ -48,89 +48,95 @@ export interface DeliveryGeneric {
 export type OrderDelivery =
   DeliveryWarehouse | DeliveryCourier | DeliveryGeneric;
 
-type SourceResult =
-  { ok: true; value: DeliverySource | undefined } | { ok: false };
-
-type NumberResult = { ok: true; value: string | undefined } | { ok: false };
-
 const isDeliveryMode = (value: unknown): value is DeliveryMode =>
   typeof value === "string" &&
   DELIVERY_MODES.some((candidate) => candidate === value);
 
-const readSource = (input: Record<string, unknown>): SourceResult => {
-  const text = readOptionalText(input, "source");
-
-  if (!text.ok) {
-    return { ok: false };
-  }
-
-  return {
-    ok: true,
-    value: DELIVERY_SOURCES.find((candidate) => candidate === text.value),
-  };
-};
-
-const readNumberedText = (
+const styleText = (
   input: Record<string, unknown>,
   key: string
-): NumberResult => {
+): string | undefined => {
+  const text = readOptionalText(input, key);
+
+  return text.ok ? text.value : undefined;
+};
+
+const numberedText = (
+  input: Record<string, unknown>,
+  key: string
+): string | undefined => {
   const value = input[key];
 
   if (typeof value === "number") {
     return Number.isSafeInteger(value) && value >= 0
-      ? { ok: true, value: String(value) }
-      : { ok: false };
+      ? String(value)
+      : undefined;
   }
 
-  return readOptionalText(input, key);
+  return styleText(input, key);
+};
+
+const readSource = (
+  input: Record<string, unknown>
+): DeliverySource | undefined => {
+  const text = styleText(input, "source");
+
+  return DELIVERY_SOURCES.find((candidate) => candidate === text);
 };
 
 const readWarehouse = (
   input: Record<string, unknown>,
-  mode: WarehouseMode,
-  source: DeliverySource | undefined
+  mode: WarehouseMode
 ): OrderDelivery | RejectReason => {
   const city = readText(input, "city");
+
+  if (city === undefined) {
+    return "delivery_city_missing";
+  }
+
   const warehouse = readText(input, "warehouse");
 
-  if (city === undefined || warehouse === undefined) {
-    return "delivery_field_missing";
+  if (warehouse === undefined) {
+    return "delivery_warehouse_missing";
   }
 
-  const number = readNumberedText(input, "warehouse_number");
-
-  if (!number.ok) {
-    return "delivery_optional_not_string";
-  }
-
-  return { mode, source, city, warehouse, warehouse_number: number.value };
+  return {
+    mode,
+    source: readSource(input),
+    city,
+    warehouse,
+    warehouse_number: numberedText(input, "warehouse_number"),
+  };
 };
 
 const readCourier = (
-  input: Record<string, unknown>,
-  source: DeliverySource | undefined
+  input: Record<string, unknown>
 ): OrderDelivery | RejectReason => {
   const city = readText(input, "city");
-  const street = readText(input, "street");
-  const building = readText(input, "building");
 
-  if (city === undefined || street === undefined || building === undefined) {
-    return "delivery_field_missing";
+  if (city === undefined) {
+    return "delivery_city_missing";
   }
 
-  const apartment = readNumberedText(input, "apartment");
+  const street = readText(input, "street");
 
-  if (!apartment.ok) {
-    return "delivery_optional_not_string";
+  if (street === undefined) {
+    return "delivery_street_missing";
+  }
+
+  const building = readText(input, "building");
+
+  if (building === undefined) {
+    return "delivery_building_missing";
   }
 
   return {
     mode: "np_courier",
-    source,
+    source: readSource(input),
     city,
     street,
     building,
-    apartment: apartment.value,
+    apartment: numberedText(input, "apartment"),
   };
 };
 
@@ -138,23 +144,21 @@ const readGeneric = (
   input: Record<string, unknown>
 ): OrderDelivery | RejectReason => {
   const city = readText(input, "city");
-  const address = readText(input, "address");
 
-  if (city === undefined || address === undefined) {
-    return "delivery_field_missing";
+  if (city === undefined) {
+    return "delivery_city_missing";
   }
 
-  const country = readOptionalText(input, "country");
-  const state = readOptionalText(input, "state");
+  const address = readText(input, "address");
 
-  if (!country.ok || !state.ok) {
-    return "delivery_optional_not_string";
+  if (address === undefined) {
+    return "delivery_address_missing";
   }
 
   return {
     mode: "generic",
-    country: country.value,
-    state: state.value,
+    country: styleText(input, "country"),
+    state: styleText(input, "state"),
     city,
     address,
   };
@@ -167,6 +171,10 @@ export const readDelivery = (input: unknown): OrderDelivery | RejectReason => {
 
   const mode = input["mode"];
 
+  if (mode === undefined || mode === null) {
+    return "delivery_mode_missing";
+  }
+
   if (!isDeliveryMode(mode)) {
     return "delivery_mode_unknown";
   }
@@ -175,15 +183,9 @@ export const readDelivery = (input: unknown): OrderDelivery | RejectReason => {
     return readGeneric(input);
   }
 
-  const source = readSource(input);
-
-  if (!source.ok) {
-    return "delivery_source_not_string";
-  }
-
   if (mode === "np_courier") {
-    return readCourier(input, source.value);
+    return readCourier(input);
   }
 
-  return readWarehouse(input, mode, source.value);
+  return readWarehouse(input, mode);
 };

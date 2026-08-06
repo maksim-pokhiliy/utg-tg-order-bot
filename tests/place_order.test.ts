@@ -255,7 +255,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
 
     const logged = joinLoggedLines(logs);
 
-    expect(logged).toContain("delivery_field_missing");
+    expect(logged).toContain("delivery_building_missing");
     expect(logged).not.toContain("required_field_missing");
   });
 
@@ -311,5 +311,76 @@ describe("POST /api/place_order with a v2 envelope", () => {
     expect(readSentMessage(fetchStub).text).not.toContain(
       "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731"
     );
+  });
+});
+
+describe("diagnosing a rejected order in production", () => {
+  it("records the version it observed on every rejection", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    await POST(new StubRequest(buildOrderV2({ total: "1e3" })));
+
+    expect(joinLoggedLines(logs)).toContain('"version":2');
+  });
+
+  it("tells a versionless v2 body apart from a broken v1 one", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    const versionless = buildOrderV2();
+
+    delete versionless["version"];
+
+    const response = await POST(new StubRequest(versionless));
+
+    expect(response.status).toBe(400);
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("required_field_missing");
+    expect(logged).toContain('"version":"absent"');
+  });
+
+  it("names the type of an unusable version rather than its value", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    await POST(new StubRequest(buildOrderV2({ version: "2" })));
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("version_unsupported");
+    expect(logged).toContain('"version":"string"');
+    expect(logged).not.toContain('"version":"2"');
+  });
+
+  it("keeps every payload value out of the rejection log", async () => {
+    const logs = captureConsoleWarn();
+
+    stubTelegram();
+
+    await POST(
+      new StubRequest(
+        buildOrderV2({ delivery: buildDeliveryCourier({ building: "  " }) })
+      )
+    );
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("delivery_building_missing");
+
+    for (const secret of [
+      "Марія",
+      "Шевченко",
+      "+380671234567",
+      "Городоцька",
+      "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731",
+    ]) {
+      expect(logged).not.toContain(secret);
+    }
   });
 });

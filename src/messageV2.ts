@@ -97,7 +97,7 @@ const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
 
   if (delivery.mode === "np_courier") {
     return [
-      `🌍 <b>City:</b> ${singleLineField(delivery.city, DELIVERY_FIELD_LIMIT)}`,
+      cityLine(delivery.city),
       `🛣️ <b>Street:</b> ${singleLineField(delivery.street, DELIVERY_FIELD_LIMIT)}`,
       `🏠 <b>Building:</b> ${singleLineField(delivery.building, BUILDING_LIMIT)}`,
       ...optionalLine(
@@ -109,7 +109,7 @@ const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
   }
 
   return [
-    `🌍 <b>City:</b> ${singleLineField(delivery.city, DELIVERY_FIELD_LIMIT)}`,
+    cityLine(delivery.city),
     `🏤 <b>Warehouse:</b> ${singleLineField(delivery.warehouse, DELIVERY_FIELD_LIMIT)}`,
     ...optionalLine(
       "🔢 <b>Warehouse No:</b>",

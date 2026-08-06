@@ -30,14 +30,14 @@ export type RejectReason =
   | "version_unsupported"
   | "customer_not_object"
   | "customer_field_missing"
-  | "patronymic_not_string"
-  | "contact_channel_not_string"
   | "delivery_not_object"
+  | "delivery_mode_missing"
   | "delivery_mode_unknown"
-  | "delivery_field_missing"
-  | "delivery_optional_not_string"
-  | "delivery_source_not_string"
-  | "comment_not_string";
+  | "delivery_city_missing"
+  | "delivery_warehouse_missing"
+  | "delivery_street_missing"
+  | "delivery_building_missing"
+  | "delivery_address_missing";
 
 export interface OrderCartItem {
   title: string;

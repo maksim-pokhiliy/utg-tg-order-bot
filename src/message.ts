@@ -62,7 +62,7 @@ export const clampEscaped = (escaped: string, limit: number): string => {
   return sliced.replace(/&[a-zA-Z]*$/, "") + ELLIPSIS;
 };
 
-export const field = (value: string, limit: number): string => {
+const field = (value: string, limit: number): string => {
   const bounded = value.slice(0, limit * MAX_ESCAPE_EXPANSION);
 
   return clampEscaped(escapeHtml(bounded.toWellFormed()), limit);

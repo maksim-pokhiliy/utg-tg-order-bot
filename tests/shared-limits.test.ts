@@ -1,0 +1,180 @@
+import { describe, expect, it } from "vitest";
+
+import { countCodePoints } from "../src/message.js";
+import { renderOrder } from "../src/messageV2.js";
+import { parseOrder } from "../src/payloadV2.js";
+import {
+  buildCartItem,
+  buildDeliveryGeneric,
+  buildOrder,
+  buildOrderV2,
+} from "./support/orderPayload.js";
+
+const BOUNDARY_CART_SIZE = 40;
+const BOUNDARY_NOTE = 494;
+const BOUNDARY_ITEMS = 40;
+const OVER_BOUNDARY_ITEMS = 39;
+const CART_TITLE_LIMIT = 200;
+const CART_URL_LIMIT = 400;
+const LONGEST_TOTAL = "9".repeat(20);
+const TITLE_LABEL = "🏷️ <b>Title:</b>";
+
+const render = (input: Record<string, unknown>): string => {
+  const result = parseOrder(input);
+
+  if (!result.ok) {
+    throw new Error(`fixture rejected: ${result.reason}`);
+  }
+
+  return renderOrder(result.value);
+};
+
+const boundaryCart = (): Record<string, unknown>[] =>
+  Array.from({ length: BOUNDARY_CART_SIZE }, (_, index) =>
+    buildCartItem({
+      title: `T${String(index)}`,
+      productUrl: "https://s.test/p",
+    })
+  );
+
+const itemsIn = (message: string): number =>
+  message.split(TITLE_LABEL).length - 1;
+
+describe("the shared telegram budget", () => {
+  it("fits exactly the cart the budget has room for", () => {
+    const message = render(
+      buildOrder({
+        additional: "x".repeat(BOUNDARY_NOTE),
+        cart: boundaryCart(),
+      })
+    );
+
+    expect(itemsIn(message)).toBe(BOUNDARY_ITEMS);
+    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+  });
+
+  it("drops one position as soon as the header grows by a single character", () => {
+    const message = render(
+      buildOrder({
+        additional: "x".repeat(BOUNDARY_NOTE + 1),
+        cart: boundaryCart(),
+      })
+    );
+
+    expect(itemsIn(message)).toBe(OVER_BOUNDARY_ITEMS);
+    expect(message).toMatch(/… <b>\+1 more positions<\/b>$/u);
+  });
+
+  it("spends the same budget and marks the same way on the v2 path", () => {
+    const v2 = render(
+      buildOrderV2({
+        locale: "uk",
+        delivery: buildDeliveryGeneric(),
+        comment: "x".repeat(BOUNDARY_NOTE),
+        cart: boundaryCart(),
+      })
+    );
+
+    expect(countCodePoints(v2)).toBeLessThanOrEqual(4096);
+    expect(v2).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
+    expect(itemsIn(v2)).toBeGreaterThan(0);
+  });
+
+  it("never grows the cart when the header grows", () => {
+    let previous = Number.POSITIVE_INFINITY;
+
+    for (const note of [0, 100, 200, 300, 400, 500, 600]) {
+      const message = render(
+        buildOrder({ additional: "x".repeat(note), cart: boundaryCart() })
+      );
+
+      const items = itemsIn(message);
+
+      expect(items).toBeLessThanOrEqual(previous);
+      expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+
+      previous = items;
+    }
+  });
+});
+
+describe("the shared cart clamps", () => {
+  it("renders a title that sits exactly on the limit whole", () => {
+    const title = "т".repeat(CART_TITLE_LIMIT);
+    const message = render(buildOrder({ cart: [buildCartItem({ title })] }));
+
+    expect(message).toContain(`${TITLE_LABEL} ${title}`);
+    expect(message).not.toContain(`${title}…`);
+  });
+
+  it("marks a title one character past the limit", () => {
+    const title = "т".repeat(CART_TITLE_LIMIT + 1);
+    const message = render(buildOrder({ cart: [buildCartItem({ title })] }));
+
+    expect(message).toContain(
+      `${TITLE_LABEL} ${"т".repeat(CART_TITLE_LIMIT)}…`
+    );
+  });
+
+  it("renders a product url that sits exactly on the limit whole", () => {
+    const productUrl = `https://s.test/${"p".repeat(CART_URL_LIMIT - 15)}`;
+    const message = render(
+      buildOrder({ cart: [buildCartItem({ productUrl })] })
+    );
+
+    expect(countCodePoints(productUrl)).toBe(CART_URL_LIMIT);
+    expect(message).toContain(`🔗 <b>Product URL:</b> ${productUrl}`);
+    expect(message).not.toContain(`${productUrl}…`);
+  });
+
+  it("marks a product url one character past the limit", () => {
+    const productUrl = `https://s.test/${"p".repeat(CART_URL_LIMIT - 14)}`;
+    const message = render(
+      buildOrder({ cart: [buildCartItem({ productUrl })] })
+    );
+
+    expect(countCodePoints(productUrl)).toBe(CART_URL_LIMIT + 1);
+    expect(message).toContain(
+      `🔗 <b>Product URL:</b> ${productUrl.slice(0, CART_URL_LIMIT)}…`
+    );
+  });
+
+  it("carries both clamps identically onto the v2 path", () => {
+    const title = "т".repeat(CART_TITLE_LIMIT + 1);
+    const v1 = render(buildOrder({ cart: [buildCartItem({ title })] }));
+    const v2 = render(buildOrderV2({ cart: [buildCartItem({ title })] }));
+    const clamped = `${TITLE_LABEL} ${"т".repeat(CART_TITLE_LIMIT)}…`;
+
+    expect(v1).toContain(clamped);
+    expect(v2).toContain(clamped);
+  });
+});
+
+describe("the clamps that no accepted payload can reach", () => {
+  it("renders the longest total the decoder accepts without marking it", () => {
+    const message = render(buildOrder({ total: LONGEST_TOTAL }));
+    const line = message
+      .split("\n")
+      .find((entry) => entry.startsWith("💲 <b>Total:</b>"));
+
+    expect(line).toBeDefined();
+    expect(line).not.toContain("…");
+    expect(countCodePoints(line ?? "")).toBeGreaterThan(30);
+  });
+
+  it("renders the largest quantity the decoder accepts without marking it", () => {
+    const message = render(
+      buildOrder({ cart: [buildCartItem({ quantity: 100000 })] })
+    );
+
+    expect(message).toContain("🔢 <b>Quantity:</b> 100000");
+  });
+
+  it("bounds the work an escape-heavy note can force", () => {
+    const before = process.memoryUsage().heapUsed;
+
+    render(buildOrder({ additional: "&".repeat(4_000_000) }));
+
+    expect(process.memoryUsage().heapUsed - before).toBeLessThan(60_000_000);
+  });
+});
