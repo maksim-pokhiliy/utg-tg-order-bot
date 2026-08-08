@@ -29,11 +29,24 @@ v1 — the version live in production today — on `master` (2026-08-08):
 | saturated cart, short titles (`Товар N`, 60 items) | 4153   | **over**      |
 | the same with one astral character per title       | 4203   | **over**      |
 
-So the framing "an emoji-heavy order is at risk" was wrong: a plain Ukrainian order with
-nothing exotic in any field already sits four units from the cliff, because the
-undercount is contributed by **our own emoji labels** (≈3 unaccounted UTF-16 units per
-rendered cart line, ≈10 for the header), not by the customer. Over the limit, Telegram
-answers 400, the relay surfaces 500, and the order is LOST. B4 also closes BDEF-5 (bidi,
+**FALSIFIED 2026-08-08 by a live probe — read this before trusting the table above.**
+The B4 review went to source: the Bot API documents the limit as "4096 characters
+**after entities parsing**", and TDLib applies it to the PARSED text via `utf8_length()`
+(code points). Roughly 980 units of our message are `<b>`/`</b>` markup that parsing
+consumes. The planner then probed the live relay with an order measuring **4178 raw
+UTF-16 / 4084 raw code points / 3419 parsed code points**: the relay answered **200 and
+Telegram delivered it**. Raw UTF-16 is therefore NOT the enforced metric, the table above
+measures a quantity Telegram does not check, and **no order was being lost at these
+sizes**. What the probe does NOT settle is whether the enforced metric is raw code points
+(which the pre-B4 code already respected) or parsed length — prod truncation can never
+emit raw code points over 4096, so discriminating those two needs a direct Telegram API
+call with the bot token. Consequences: the "one customer away from a silent outage"
+framing is retracted, and **reordering B4 ahead of B5 was a planner error** — persistence
+was the more urgent step and orders stayed non-durable for an extra round. What survives:
+B4's accounting is the only one provably safe under all four candidate metrics (parsed ≤
+raw and code points ≤ UTF-16, so raw UTF-16 upper-bounds every one of them, while the old
+raw-code-point budget is unsafe under a parsed-UTF-16 reading), it costs 0–1 cart lines,
+and it is the correct posture while the ceiling's unit is unknown. B4 also closes BDEF-5 (bidi,
 zero-width and math-bold characters that mislead an operator: a warehouse label can
 render its digits reversed, and a comment line can imitate the genuine Address Source
 line above it). The golden corpus KEEPS its legacy pin — B4 adds a second named
