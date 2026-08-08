@@ -52,6 +52,17 @@ interface FieldProbe {
   build: (value: string) => Record<string, unknown>;
 }
 
+const ADDITIONAL_LABEL = "📄 <b>Additional Information:</b>";
+
+const NORMALIZES_TO_MARKUP: readonly (readonly [string, string])[] = [
+  ["﹠", "&amp;"],
+  ["﹤", "&lt;"],
+  ["﹥", "&gt;"],
+  ["＆", "&amp;"],
+  ["＜", "&lt;"],
+  ["＞", "&gt;"],
+];
+
 const render = (input: Record<string, unknown>): string => {
   const result = parseOrder(input);
 
@@ -60,6 +71,16 @@ const render = (input: Record<string, unknown>): string => {
   }
 
   return renderOrder(result.value);
+};
+
+const lineOf = (message: string, label: string): string => {
+  const line = message.split("\n").find((entry) => entry.startsWith(label));
+
+  if (line === undefined) {
+    throw new Error(`no line labelled ${label}`);
+  }
+
+  return line;
 };
 
 const V1_FIELDS: readonly FieldProbe[] = [
@@ -236,6 +257,24 @@ describe("the characters that were lying to the operator", () => {
     expect(message).not.toContain("<b>Bobby</b>");
   });
 
+  for (const [raw, escaped] of NORMALIZES_TO_MARKUP) {
+    it(`escapes ${JSON.stringify(raw)}, which normalization turns into markup`, () => {
+      const message = render(buildOrder({ first_name: `A${raw}B` }));
+
+      expect(lineOf(message, "👤 <b>First Name:</b>")).toBe(
+        `👤 <b>First Name:</b> A${escaped}B`
+      );
+    });
+  }
+
+  it("bounds the work before sanitizing, not after", () => {
+    const beyondTheBound = `${ZERO_WIDTH_SPACE.repeat(2000)}Kyiv`;
+    const message = render(buildOrder({ city: beyondTheBound }));
+
+    expect(message).not.toContain("Kyiv");
+    expect(lineOf(message, "🌍 <b>City:</b>")).toBe("🌍 <b>City:</b> ");
+  });
+
   it("drops tag characters, which carry no visible glyph at all", () => {
     const message = render(
       buildOrder({ city: `Київ${TAG_LETTER}${TAG_LETTER}` })
@@ -246,11 +285,29 @@ describe("the characters that were lying to the operator", () => {
   });
 
   it("keeps a variation selector, which is a mark and not a format control", () => {
-    const message = render(
-      buildOrder({ additional: `на пошту 🏷${VARIATION_SELECTOR} будь ласка` })
-    );
+    const typed = `🏷${VARIATION_SELECTOR}`;
+    const message = render(buildOrder({ additional: typed }));
 
-    expect(message).toContain(`🏷${VARIATION_SELECTOR}`);
+    expect(lineOf(message, ADDITIONAL_LABEL)).toBe(
+      `${ADDITIONAL_LABEL} ${typed}`
+    );
+  });
+
+  it("splits a zwj sequence, because the joiner is a format character", () => {
+    const family = `👨${ZERO_WIDTH_JOINER}👩${ZERO_WIDTH_JOINER}👧`;
+    const message = render(buildOrder({ additional: family }));
+
+    expect(lineOf(message, ADDITIONAL_LABEL)).toBe(
+      `${ADDITIONAL_LABEL} 👨👩👧`
+    );
+    expect(message).not.toContain(family);
+  });
+
+  it("degrades a tag-sequence flag to its base flag", () => {
+    const scotland = "🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}";
+    const message = render(buildOrder({ additional: scotland }));
+
+    expect(lineOf(message, ADDITIONAL_LABEL)).toBe(`${ADDITIONAL_LABEL} 🏴`);
   });
 
   it("still replaces the lone surrogates valid json can carry", () => {

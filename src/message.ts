@@ -22,10 +22,10 @@ const LOCALE_CURRENCY: ReadonlyMap<string, string> = new Map([
   ["en", "USD"],
 ]);
 
-const buildOmittedMarker = (omitted: number): string =>
+export const buildOmittedMarker = (omitted: number): string =>
   `${ELLIPSIS} <b>+${String(omitted)} more positions</b>`;
 
-const omittedMarkerAllowance = (cartSize: number): number =>
+export const omittedMarkerAllowance = (cartSize: number): number =>
   buildOmittedMarker(0).length +
   Math.max(MIN_OMITTED_DIGITS, String(cartSize).length) +
   ITEM_SEPARATOR.length;
