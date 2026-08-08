@@ -327,3 +327,47 @@ Append-only. One entry per session/step.
   operators' chat (TEST-labeled, 200/200). v1 is what the live shop sends today, so
   proving it still delivers end to end was the point — byte-identical rendering does
   not prove a deployed function works.
+
+## 2026-08-08 — B4: the fix shipped, the reason for it did not
+
+- **B4 CLOSED** (PR #3 `7594e94`, squash-merged, prod deployed, sanitizer smoke sent).
+  One sanitizer over payload-derived strings only — well-formedness, NFKC, `\p{Cf}`
+  strip — plus the whole message layer unified on UTF-16. `src/messageV2.ts` needed
+  ZERO changes: every v2 string already flowed through the v1 field doors, which is the
+  best evidence the B3 boundaries were drawn in the right place. 350 tests, up from 285.
+- **The premise died mid-flight, and that is the entry's point.** The step was justified
+  by a table the planner measured personally: a saturated v1 order at 4092–4203 raw
+  UTF-16 against Telegram's 4096, and 7150 for v2. The independent review went to source
+  instead of to the ledger: the Bot API applies 4096 to the text AFTER entities parsing,
+  and TDLib counts code points there — while roughly 980 units of our message are
+  `<b>`/`</b>` markup that parsing consumes. A live probe settled it: an order measuring
+  **4178 raw UTF-16 / 3419 parsed code points was DELIVERED** (relay 200). No order was
+  being lost. The 68%-over-limit sweep measured a quantity Telegram does not check.
+- **Process lesson, named plainly.** The planner measured OUR side of the inequality to
+  the unit and took the OTHER side — the external ceiling — from a ledger sentence
+  written during an earlier review. Measuring one side precisely while assuming the
+  other is worthless. The decisive test was one POST and cost two minutes; it was run
+  LAST, after an executor round, an xhigh review round and a fix round, and after the
+  false framing had been written into two ledgers and the board. **Reconnaissance that
+  gates a step belongs before the step prompt, not after the PR.** The same shape is
+  already queued on Нова Пошта: U4 was built against substitute fixtures because the
+  portal 403s, and the live-key check is scheduled only at U7 — after U5b builds UI on
+  the assumed response shape. Pulling that forward is the concrete consequence.
+- **Why it merged anyway, on a narrower claim.** Parsed ≤ raw and code points ≤ UTF-16,
+  so raw UTF-16 upper-bounds all four candidate metrics: it is the only accounting safe
+  under every reading, while the old raw-code-point budget is unsafe if the ceiling is
+  parsed UTF-16. Cost: 0–1 cart lines. What remains unknown — raw code points vs parsed
+  length — is BDEF-8, and settling it would reclaim ~980 units of cart room.
+- **BDEF-5 is untouched by any of this and fully earned.** Bidi, zero-width, math-bold
+  and fullwidth no longer survive a field. Bold in an order message now means the relay
+  wrote it, so the `Address Source` line is a real forgery guard rather than a disclaimed
+  one. Verified live: an order carrying an RLO, math-bold imitating that very line,
+  zero-width padding, a ZWJ family emoji and a fullwidth `＜b＞` rendered clean.
+- **The review earned its keep twice over.** 28 candidates pooled before the cap, 12
+  reported plus a named 16-item tail. It killed the premise, and it proved by mutation
+  that four properties the PR itself called load-bearing were pinned by nothing —
+  including the ONE test covering a ruling made two turns earlier, which could not fail
+  because it asserted against a label the relay renders itself.
+- Planner verification: battery re-run by hand, corpus fixture blob compared across four
+  refs (identical), and a mutation planted at the sanitize/escape boundary — 4 tests red,
+  restored byte-identical.
