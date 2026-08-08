@@ -1,7 +1,7 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-08 (B4 CLOSED — its width premise was falsified mid-flight by a live
-probe and the fix merged on a narrower claim; B5 is the last bot step)
+**Updated:** 2026-08-08 (B4 CLOSED; the shop's U5a shipped and now sends v2 with an
+idempotency key — B5 is the last bot step and it inherits BDEF-9)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -30,7 +30,11 @@ of this and fully earned: bold in an order message now means the relay wrote it.
 
 **B5 is the last step here — orders become durable** (shop D-11, closes BDEF-3). Every
 decoded order written to Postgres (Neon) BEFORE the Telegram send, keyed by
-`idempotency_key` when the shop starts minting it and by a content hash until then. The
+a content hash within a time window. **BDEF-9 is a hard constraint, not a preference:
+the shop MINTS the key on first submit and resets it only on success, so the key
+deliberately spans an order the buyer edited between retries — dedupe on the key alone
+would answer 200 to a corrected order that was never delivered, and the shop would show
+the success screen and clear the cart. The key is a hint, never an identity.** The
 design rule is absolute and predates this board: **the store must never gate the send — a
 dead database costs an audit row, never an order.** Two things sharpen it now: today's work
 proved the RENDERED MESSAGE is lossy (truncation drops cart lines with only a "+N more

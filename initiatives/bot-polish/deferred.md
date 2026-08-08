@@ -22,6 +22,9 @@ the trail) · `DROPPED` (decided not to).
 
 | BDEF-8 | The enforced Telegram metric is still unknown between two candidates: raw code points (which the pre-B4 code respected) or parsed length. The live probe eliminated raw UTF-16 only -- prod truncation can never emit a message over 4096 raw code points, so the relay cannot discriminate the remaining two | Settling it needs a direct Telegram API call with the bot token on a scratch chat: one message at raw 5000 / parsed 4090, one at 3000 astral code points. Worth doing because a parsed-length budget would reclaim roughly **980 units of cart room** -- real operator value, since truncation silently drops order lines. Do NOT loosen the budget on the hypothesis alone: the permissive direction costs a lost order, and there is no replay path until B5 | OPEN |
 
+| BDEF-9 | **B5 must not deduplicate on `idempotency_key` alone.** The shop mints the key on first submit and resets it only on success (D-11), which means the key deliberately SPANS an order the buyer edited between retries — remove a cart line after an ambiguous failure and the corrected order arrives under the original key | Ruled shop-side as D-13 (2026-08-08), verified by execution during the U5a review in jsdom and in real Chromium: same key, `total` 1300.00 then 300.00, two lines then one. Live impact today is zero because nothing reads the key. But key-only dedupe in B5 would answer 200 to an order that was never delivered, and the shop would show the success screen and call `clear()` — the buyer loses their cart believing the CORRECTED order was accepted. Re-minting on cart change is NOT the fix: it resurrects the exact duplicate the key exists to prevent. **Dedupe on a content hash within a time window; treat the key as a hint, never as an identity** | SCHEDULED → B5 |
+
+
 ## Detail on the live ones
 
 **BDEF-1 (closed).** The BD-4 order held exactly as written. One correction learned in
