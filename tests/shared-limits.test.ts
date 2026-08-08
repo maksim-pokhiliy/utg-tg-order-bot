@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { countCodePoints } from "../src/message.js";
 import { renderOrder } from "../src/messageV2.js";
 import { parseOrder } from "../src/payloadV2.js";
 import {
@@ -12,7 +11,7 @@ import {
 
 const TELEGRAM_LIMIT = 4096;
 const BOUNDARY_CART_SIZE = 40;
-const BOUNDARY_NOTE = 494;
+const BOUNDARY_NOTE = 364;
 const BOUNDARY_ITEMS = 40;
 const OVER_BOUNDARY_ITEMS = 39;
 const CART_TITLE_LIMIT = 200;
@@ -165,7 +164,7 @@ describe("the shared cart clamps", () => {
       buildOrder({ cart: [buildCartItem({ productUrl })] })
     );
 
-    expect(countCodePoints(productUrl)).toBe(CART_URL_LIMIT);
+    expect(productUrl.length).toBe(CART_URL_LIMIT);
     expect(message).toContain(`🔗 <b>Product URL:</b> ${productUrl}`);
     expect(message).not.toContain(`${productUrl}…`);
   });
@@ -176,7 +175,7 @@ describe("the shared cart clamps", () => {
       buildOrder({ cart: [buildCartItem({ productUrl })] })
     );
 
-    expect(countCodePoints(productUrl)).toBe(CART_URL_LIMIT + 1);
+    expect(productUrl.length).toBe(CART_URL_LIMIT + 1);
     expect(message).toContain(
       `🔗 <b>Product URL:</b> ${productUrl.slice(0, CART_URL_LIMIT)}…`
     );
@@ -202,7 +201,7 @@ describe("the clamps that no accepted payload can reach", () => {
 
     expect(line).toBeDefined();
     expect(line).not.toContain("…");
-    expect(countCodePoints(line ?? "")).toBeGreaterThan(30);
+    expect((line ?? "").length).toBeGreaterThan(30);
   });
 
   it("renders the largest quantity the decoder accepts without marking it", () => {

@@ -8,7 +8,7 @@ const QUANTITY_LIMIT = 12;
 const CART_TITLE_LIMIT = 200;
 const CART_URL_LIMIT = 400;
 const MAX_ESCAPE_EXPANSION = 5;
-const MAX_OMITTED_DIGITS = 6;
+const MIN_OMITTED_DIGITS = 6;
 const ELLIPSIS = "…";
 const ITEM_SEPARATOR = "\n\n";
 const PRODUCTS_HEADING = "🛒 <b>Products:</b>";
@@ -22,23 +22,13 @@ const LOCALE_CURRENCY: ReadonlyMap<string, string> = new Map([
   ["en", "USD"],
 ]);
 
-export const countCodePoints = (value: string): number => {
-  let total = 0;
-
-  for (const _ of value) {
-    total += 1;
-  }
-
-  return total;
-};
-
 const buildOmittedMarker = (omitted: number): string =>
   `${ELLIPSIS} <b>+${String(omitted)} more positions</b>`;
 
-const OMITTED_MARKER_ALLOWANCE =
-  countCodePoints(buildOmittedMarker(0)) +
-  MAX_OMITTED_DIGITS +
-  countCodePoints(ITEM_SEPARATOR);
+const omittedMarkerAllowance = (cartSize: number): number =>
+  buildOmittedMarker(0).length +
+  Math.max(MIN_OMITTED_DIGITS, String(cartSize).length) +
+  ITEM_SEPARATOR.length;
 
 export const escapeHtml = (value: string): string =>
   value
@@ -46,33 +36,54 @@ export const escapeHtml = (value: string): string =>
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;");
 
+const sliceUnits = (value: string, limit: number): string => {
+  let used = 0;
+
+  for (const point of value) {
+    if (used + point.length > limit) {
+      break;
+    }
+
+    used += point.length;
+  }
+
+  return value.slice(0, used);
+};
+
 export const clampEscaped = (escaped: string, limit: number): string => {
   if (escaped.length <= limit) {
     return escaped;
   }
 
-  const points = Array.from(escaped);
-
-  if (points.length <= limit) {
-    return escaped;
-  }
-
-  const sliced = points.slice(0, limit).join("");
-
-  return sliced.replace(/&[a-zA-Z]*$/, "") + ELLIPSIS;
+  return sliceUnits(escaped, limit).replace(/&[a-zA-Z]*$/, "") + ELLIPSIS;
 };
 
-const field = (value: string, limit: number): string => {
-  const bounded = value.slice(0, limit * MAX_ESCAPE_EXPANSION);
+const boundWork = (value: string, limit: number): string =>
+  value.slice(0, limit * MAX_ESCAPE_EXPANSION);
 
-  return clampEscaped(escapeHtml(bounded.toWellFormed()), limit);
-};
+const sanitizeInput = (value: string): string =>
+  value
+    .toWellFormed()
+    .normalize("NFKC")
+    .replaceAll(/\p{Cf}/gu, "");
+
+const escapeAndClamp = (value: string, limit: number): string =>
+  clampEscaped(escapeHtml(value), limit);
+
+const payloadField = (value: string, limit: number): string =>
+  escapeAndClamp(sanitizeInput(boundWork(value, limit)), limit);
+
+const generatedField = (value: string, limit: number): string =>
+  escapeAndClamp(value, limit);
 
 export const collapseNewlines = (value: string): string =>
   value.replaceAll(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/gu, " ");
 
 export const singleLineField = (value: string, limit: number): string =>
-  field(collapseNewlines(value), limit);
+  escapeAndClamp(
+    collapseNewlines(sanitizeInput(boundWork(value, limit))),
+    limit
+  );
 
 const resolveStyleLocale = (locale: string): string =>
   STYLE_LOCALES.has(locale) ? locale : DEFAULT_LOCALE;
@@ -119,10 +130,10 @@ export const totalLine = (
   locale: string,
   currency: string | undefined
 ): string =>
-  `💲 <b>Total:</b> ${field(formatTotal(total, locale, currency), TOTAL_LIMIT)}`;
+  `💲 <b>Total:</b> ${generatedField(formatTotal(total, locale, currency), TOTAL_LIMIT)}`;
 
 export const additionalLine = (value: string): string =>
-  `📄 <b>Additional Information:</b> ${field(value, ADDITIONAL_LIMIT)}`;
+  `📄 <b>Additional Information:</b> ${payloadField(value, ADDITIONAL_LIMIT)}`;
 
 const buildHeader = (payload: OrderPayload): readonly string[] => [
   firstNameLine(payload.first_name),
@@ -139,7 +150,7 @@ const buildHeader = (payload: OrderPayload): readonly string[] => [
 const buildItem = (item: OrderCartItem): string =>
   [
     `🏷️ <b>Title:</b> ${singleLineField(item.title, CART_TITLE_LIMIT)}`,
-    `🔢 <b>Quantity:</b> ${field(String(item.quantity), QUANTITY_LIMIT)}`,
+    `🔢 <b>Quantity:</b> ${generatedField(String(item.quantity), QUANTITY_LIMIT)}`,
     `🔗 <b>Product URL:</b> ${singleLineField(item.productUrl, CART_URL_LIMIT)}`,
   ].join("\n");
 
@@ -157,17 +168,16 @@ export const composeMessage = (
 
   const budget =
     MAX_TELEGRAM_TEXT_LENGTH -
-    countCodePoints(header) -
-    OMITTED_MARKER_ALLOWANCE;
+    header.length -
+    omittedMarkerAllowance(cart.length);
 
-  const separatorCost = countCodePoints(ITEM_SEPARATOR);
+  const separatorCost = ITEM_SEPARATOR.length;
   const rendered: string[] = [];
   let used = 0;
 
   for (const item of cart) {
     const block = buildItem(item);
-    const cost =
-      countCodePoints(block) + (rendered.length === 0 ? 0 : separatorCost);
+    const cost = block.length + (rendered.length === 0 ? 0 : separatorCost);
 
     if (used + cost > budget) {
       break;
