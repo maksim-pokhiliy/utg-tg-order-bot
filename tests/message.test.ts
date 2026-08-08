@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   buildOrderMessage,
   clampEscaped,
-  countCodePoints,
   escapeHtml,
   formatTotal,
 } from "../src/message.js";
@@ -85,11 +84,18 @@ describe("clampEscaped", () => {
     expect(clampEscaped("aa&amp;bb", 4)).toBe("aa…");
   });
 
-  it("clamps emoji without splitting a surrogate pair", () => {
+  it("spends the limit in utf-16 units, so one emoji costs two", () => {
     const clamped = clampEscaped("🎯🎯🎯🎯", 2);
 
-    expect(clamped).toBe("🎯🎯…");
+    expect(clamped).toBe("🎯…");
     expect(Buffer.from(clamped, "utf8").toString("utf8")).toBe(clamped);
+    expect(clamped).not.toMatch(/[\uD800-\uDFFF]/u);
+  });
+
+  it("stops short rather than splitting a pair across the boundary", () => {
+    const clamped = clampEscaped("🎯🎯🎯🎯", 3);
+
+    expect(clamped).toBe("🎯…");
     expect(clamped).not.toMatch(/[\uD800-\uDFFF]/u);
   });
 
@@ -153,8 +159,8 @@ describe("buildOrderMessage", () => {
     expect(message).toContain("Ky�iv");
   });
 
-  it("keeps the budget in code points when fields are non-BMP", () => {
-    const astral = "𝕏".repeat(200);
+  it("keeps the budget in utf-16 units when fields are non-BMP", () => {
+    const astral = "🎯".repeat(200);
     const message = buildOrderMessage(
       parse({
         first_name: astral,
@@ -164,14 +170,26 @@ describe("buildOrderMessage", () => {
         state: astral,
         city: astral,
         address: astral,
-        additional: "𝕏".repeat(600),
+        additional: "🎯".repeat(600),
         cart: [buildCartItem(), buildCartItem({ title: "Second" })],
       })
     );
 
+    expect(message.length).toBeLessThanOrEqual(4096);
     expect(message).toContain("🏷️ <b>Title:</b>");
     expect(message).toContain("Second");
     expect(message).not.toMatch(/\+\d+ more positions/);
+  });
+
+  it("charges an astral field two units per character, not one", () => {
+    const message = buildOrderMessage(parse({ city: "🎯".repeat(200) }));
+    const line = message
+      .split("\n")
+      .find((entry) => entry.startsWith("🌍 <b>City:</b>"));
+
+    expect(line).toBeDefined();
+    expect(line).toContain("…");
+    expect(Array.from(line ?? "").length).toBeLessThan((line ?? "").length);
   });
 
   it("cannot be tricked into forging a second product block", () => {
@@ -221,7 +239,7 @@ describe("buildOrderMessage", () => {
     const message = buildOrderMessage(parse({ additional: "x".repeat(5000) }));
 
     expect(message).toContain("…");
-    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+    expect(message.length).toBeLessThanOrEqual(4096);
   });
 
   it("truncates the cart listing and reports how many positions were dropped", () => {
@@ -231,7 +249,7 @@ describe("buildOrderMessage", () => {
 
     const message = buildOrderMessage(parse({ cart }));
 
-    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+    expect(message.length).toBeLessThanOrEqual(4096);
     expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/);
     expect(message).toContain("👤 <b>First Name:</b> Олександр");
     expect(message).toContain("💲 <b>Total:</b>");
@@ -252,7 +270,7 @@ describe("buildOrderMessage", () => {
       })
     );
 
-    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+    expect(message.length).toBeLessThanOrEqual(4096);
     expect(message).toContain("🛒 <b>Products:</b>");
     expect(message).toContain("🏷️ <b>Title:</b>");
   });
@@ -264,7 +282,7 @@ describe("buildOrderMessage", () => {
 
     const message = buildOrderMessage(parse({ cart }));
 
-    expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+    expect(message.length).toBeLessThanOrEqual(4096);
     expect(message).toContain("Товар 24");
   });
 });

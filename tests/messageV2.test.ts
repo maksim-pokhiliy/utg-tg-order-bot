@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { countCodePoints } from "../src/message.js";
 import { renderOrder } from "../src/messageV2.js";
 import { parseOrder, type OrderEnvelope } from "../src/payloadV2.js";
 import {
@@ -382,7 +381,7 @@ describe("the v2 delivery blocks", () => {
 
     expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta branch");
     expect(message).toContain(
-      `${LABEL_WAREHOUSE} Відділення №1: вул. Городоцька, 359`
+      `${LABEL_WAREHOUSE} Відділення No1: вул. Городоцька, 359`
     );
     expect(message).toContain(`${LABEL_WAREHOUSE_NUMBER} 1`);
 
@@ -396,7 +395,7 @@ describe("the v2 delivery blocks", () => {
 
     expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta parcel locker");
     expect(message).toContain(
-      `${LABEL_WAREHOUSE} Поштомат №12345: вул. Стрийська, 30, магазин «АТБ»`
+      `${LABEL_WAREHOUSE} Поштомат No12345: вул. Стрийська, 30, магазин «АТБ»`
     );
     expect(message).toContain(`${LABEL_WAREHOUSE_NUMBER} 12345`);
 
@@ -634,7 +633,7 @@ describe("the v2 message budget", () => {
         })
       );
 
-      expect(countCodePoints(message)).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+      expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
       expect(message).toContain(LABEL_PRODUCTS);
       expect(message.split(LABEL_TITLE).length).toBeGreaterThanOrEqual(
         MIN_SURVIVING_ITEM_BLOCKS
@@ -646,7 +645,7 @@ describe("the v2 message budget", () => {
     it(`keeps a legitimate 25-position order to ${name} intact`, () => {
       const message = render(buildOrderV2({ delivery, cart: REALISTIC_CART }));
 
-      expect(countCodePoints(message)).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+      expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
       expect(message).not.toMatch(/\+\d+ more positions/);
       expect(message.split(LABEL_TITLE)).toHaveLength(REALISTIC_CART_SIZE + 1);
 
@@ -683,7 +682,7 @@ describe("the v2 clamp limits", () => {
     const clamped = valueOf(render(build(overBound)), label);
 
     expect(clamped).toBe(`${FILLER.repeat(limit)}…`);
-    expect(countCodePoints(clamped)).toBe(limit + 1);
+    expect(clamped.length).toBe(limit + 1);
   };
 
   it("clamps the patronymic at 60", () => {

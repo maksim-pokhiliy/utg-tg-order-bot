@@ -14,6 +14,11 @@ const CORPUS_PATH = fileURLToPath(
 const EXPECTED_ENTRIES = 12;
 const EXPECTED_BASELINE = "master";
 const EXPECTED_COMMIT = "40ca4c5d2cd46cf1eb10e0887399338215534e0a";
+const ASTRAL_ENTRY = "lone-surrogate-and-astral";
+const INTENDED_DIVERGENCES: ReadonlySet<string> = new Set([ASTRAL_ENTRY]);
+const MATH_DOUBLE_STRUCK_X = "𝕏";
+const FIRST_NAME_WIDTH = 200;
+const ADDITIONAL_WIDTH = 600;
 
 interface CorpusEntry {
   name: string;
@@ -137,13 +142,31 @@ describe("the v1 golden corpus captured from master", () => {
     ]);
   });
 
+  it("names only divergences the corpus actually carries", () => {
+    const names = new Set(corpus.entries.map((entry) => entry.name));
+
+    for (const name of INTENDED_DIVERGENCES) {
+      expect(names.has(name)).toBe(true);
+    }
+
+    expect(INTENDED_DIVERGENCES.size).toBe(1);
+  });
+
   for (const entry of corpus.entries) {
+    if (INTENDED_DIVERGENCES.has(entry.name)) {
+      continue;
+    }
+
     it(`renders ${entry.name} through the v1 path exactly as master did`, () => {
       expect(renderThroughV1(entry.input)).toBe(entry.message);
     });
   }
 
   for (const entry of corpus.entries) {
+    if (INTENDED_DIVERGENCES.has(entry.name)) {
+      continue;
+    }
+
     it(`routes ${entry.name} through the dispatcher to the same bytes`, () => {
       expect(renderThroughDispatch(entry.input)).toBe(entry.message);
     });
@@ -174,5 +197,58 @@ describe("the one deliberate divergence from master on the v1 path", () => {
       expect(message).not.toMatch(FORBIDDEN);
       expect(message).toContain("Шевченка 12");
     }
+  });
+});
+
+describe("the second deliberate divergence, added by the sanitizer", () => {
+  const entry = corpus.entries.find(
+    (candidate) => candidate.name === ASTRAL_ENTRY
+  );
+  const master = entry?.message ?? "";
+  const input = entry?.input ?? {};
+
+  it("is the only corpus entry whose input the sanitizer touches", () => {
+    expect(entry).toBeDefined();
+    expect(master).toContain(MATH_DOUBLE_STRUCK_X);
+  });
+
+  it("folds the math double-struck capitals master relayed verbatim", () => {
+    const rendered = renderThroughV1(input);
+
+    expect(rendered).not.toBe(master);
+    expect(rendered).not.toContain(MATH_DOUBLE_STRUCK_X);
+    expect(rendered).toContain(
+      `👤 <b>First Name:</b> ${"X".repeat(FIRST_NAME_WIDTH)}`
+    );
+    expect(rendered).toContain(
+      `📄 <b>Additional Information:</b> ${"X".repeat(ADDITIONAL_WIDTH)}`
+    );
+  });
+
+  it("spends half the width master spent on the same two fields", () => {
+    const rendered = renderThroughV1(input);
+
+    expect(master.length).toBe(2177);
+    expect(rendered.length).toBeLessThan(master.length);
+    expect(rendered.length).toBeLessThanOrEqual(4096);
+  });
+
+  it("changes nothing else about the entry", () => {
+    const rendered = renderThroughV1(input);
+
+    for (const line of [
+      "🧔 <b>Last Name:</b> Петренко",
+      "📞 <b>Telephone:</b> +380671234567",
+      "🌍 <b>Country:</b> Україна",
+      "🌍 <b>City:</b> Ky�iv",
+      `💲 <b>Total:</b> 46\u00A0200,00\u00A0₴`,
+    ]) {
+      expect(master).toContain(line);
+      expect(rendered).toContain(line);
+    }
+  });
+
+  it("routes to the same bytes through the dispatcher", () => {
+    expect(renderThroughDispatch(input)).toBe(renderThroughV1(input));
   });
 });

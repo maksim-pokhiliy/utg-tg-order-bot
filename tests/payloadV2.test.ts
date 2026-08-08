@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { countCodePoints } from "../src/message.js";
 import { renderOrder } from "../src/messageV2.js";
 import { parseOrderPayload, type RejectReason } from "../src/payload.js";
 import {
@@ -1156,7 +1155,7 @@ describe("the reject reason set", () => {
       const message = renderOrder(result.value);
 
       rendered += 1;
-      expect(countCodePoints(message)).toBeLessThanOrEqual(4096);
+      expect(message.length).toBeLessThanOrEqual(4096);
       expect(message).toContain("\u{1F6D2} <b>Products:</b>");
     }
 
