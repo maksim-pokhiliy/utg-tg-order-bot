@@ -1,6 +1,7 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-06 (B2 CLOSED — the relay now authenticates; B3 next: dual-accept v2)
+**Updated:** 2026-08-08 (B3 CLOSED and prod-smoked; B4 running — message-width truth,
+and it gates the shop's U5a merge)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -12,22 +13,32 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 | B1  | Relay rewrite (currency read, injection fix, validation, floor) | ✅ shipped — merged `2a1dea3`, prod-smoked    | journal 2026-08-03               |
 | B2  | Shop-side secret sender + env enablement                        | ✅ shipped — shop PR #20 `bb3f866`, enforcement live and verified | shop journal 2026-08-06 |
 | B3  | Relay dual-accepts v1 + v2 payloads                             | ✅ shipped — PR #2 `66134ee`, both paths prod-smoked | journal 2026-08-06 |
-| B4  | Message-width truth: UTF-16 budget + misleading characters      | ⬜ NEXT — gates the shop's U5a merge          | `deferred.md` BDEF-4 / BDEF-5         |
+| B4  | Message-width truth: UTF-16 budget + misleading characters      | 🟡 running — gates the shop's U5a merge      | `step-b4-message-width-prompt.md` · BDEF-4 / BDEF-5 |
 | B5  | Orders persisted to Postgres before the Telegram send           | ⬜ pending                                    | shop D-11 · `deferred.md` BDEF-3      |
 
 ## Next action
 
-**B4 — message-width truth, and it now GATES the shop's U5a merge.** The B3 review
-quantified the pre-existing BDEF-4 defect against the NEW code: a v2 free-form order
-reaches **7150 UTF-16 units at 3830 code points — +74% over Telegram's real 4096 limit**,
-a materially wider radius than v1 ever had. Our truncation counts code points; Telegram
-counts UTF-16. So an emoji-heavy comment passes our budget, Telegram answers 400, the
-relay surfaces 500, and the order is LOST. v2 stays dormant until the shop's U5a ships
-it — which is exactly why this lands first. B4 also closes BDEF-5 (bidi, zero-width and
-math-bold characters that mislead an operator: a warehouse label can render its digits
-reversed, and a comment line can imitate the genuine Address Source line above it).
-Both fixes change v1 truncation, so B4 re-cuts the golden corpus DELIBERATELY — that is
-the step's job, not a regression to defend against.
+**B4 — message-width truth, and it GATES the shop's U5a merge.** Our budget counts code
+points; Telegram counts UTF-16. The B3 review measured the v2 blast radius (**7150
+UTF-16 units at 3830 code points, +74% over the 4096 limit**); the planner then measured
+v1 — the version live in production today — on `master` (2026-08-08):
+
+| v1 order                                          | UTF-16 | vs 4096       |
+| ------------------------------------------------- | ------ | ------------- |
+| saturated cart, realistic long catalog titles      | 4092   | 4 units under |
+| saturated cart, short titles (`Товар N`, 60 items) | 4153   | **over**      |
+| the same with one astral character per title       | 4203   | **over**      |
+
+So the framing "an emoji-heavy order is at risk" was wrong: a plain Ukrainian order with
+nothing exotic in any field already sits four units from the cliff, because the
+undercount is contributed by **our own emoji labels** (≈3 unaccounted UTF-16 units per
+rendered cart line, ≈10 for the header), not by the customer. Over the limit, Telegram
+answers 400, the relay surfaces 500, and the order is LOST. B4 also closes BDEF-5 (bidi,
+zero-width and math-bold characters that mislead an operator: a warehouse label can
+render its digits reversed, and a comment line can imitate the genuine Address Source
+line above it). The golden corpus KEEPS its legacy pin — B4 adds a second named
+divergence beside the existing line-separator one, and exactly two of twelve entries may
+move; a change in any of the other ten is a defect, not a re-cut.
 
 Then **B5** — persistence (shop D-11): every decoded order written to Postgres before
 the send, keyed by `idempotency_key`, closing BDEF-3. Reordered behind B4 deliberately:
