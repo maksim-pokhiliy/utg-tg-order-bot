@@ -187,7 +187,9 @@ describe("the relay with a store", () => {
 
     expect(response.status).toBe(200);
     expect(readTelegramCalls(stub)).toHaveLength(1);
-    expect(readTelegramCall(stub).text).toContain("₴300.00");
+    expect(readTelegramCall(stub).text).toContain("300,00");
+    expect(readTelegramCall(stub).text).not.toContain("1300");
+    expect(readTelegramCall(stub).text).not.toContain("Другий шеврон");
     expect(joinAllLogged(logs)).not.toContain("order_deduplicated");
   });
 

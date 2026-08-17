@@ -8,7 +8,7 @@
   ],
   "functions": {
     "api/place_order.ts": {
-      "maxDuration": 15
+      "maxDuration": 30
     }
   }
 }
