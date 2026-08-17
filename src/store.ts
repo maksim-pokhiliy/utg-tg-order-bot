@@ -1,17 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { readEnv } from "./env.js";
+import { runStatement, type StoreFailure } from "./neon.js";
 import { hashOrder } from "./orderHash.js";
 import type { OrderEnvelope } from "./payloadV2.js";
 import type { SendFailure } from "./telegram.js";
+
+export type { StoreFailure };
 
 export const STORE_QUERY_TIMEOUT_MS = 2_000;
 export const STORE_MARK_TIMEOUT_MS = 2_500;
 export const DEDUPE_WINDOW_SECONDS = 1_800;
 
-const NEON_SQL_PATH = "/sql";
-const CONNECTION_HEADER = "Neon-Connection-String";
-const REQUEST_ID_HEADER = "neon-request-id";
 const SCHEMA_VERSION_V1 = 1;
 const SCHEMA_VERSION_V2 = 2;
 const HASH_LOG_PREFIX = 12;
@@ -44,14 +43,6 @@ on conflict (attempt_id) do update set
   telegram_message_id = $7,
   send_failure = $8`;
 
-export type StoreFailure =
-  | "not_configured"
-  | "bad_config"
-  | "upstream_rejected"
-  | "response_unreadable"
-  | "timeout"
-  | "network_error";
-
 export interface OrderAttempt {
   attemptId: string;
   contentHash: string;
@@ -83,169 +74,8 @@ export type AttemptOutcome =
 export type DedupeVerdict =
   { isSuppressed: true; dupeOf: string } | { isSuppressed: false };
 
-interface NeonStatement {
-  query: string;
-  params: readonly unknown[];
-}
-
-type NeonOutcome =
-  | { ok: true; rows: readonly Record<string, unknown>[] }
-  | { ok: false; reason: StoreFailure };
-
-const logFailure = (event: string, detail: Record<string, unknown>): void => {
-  console.warn(JSON.stringify({ event, ...detail }));
-};
-
 const logStored = (detail: Record<string, unknown>): void => {
   console.log(JSON.stringify({ event: "order_stored", ...detail }));
-};
-
-const isTimeout = (error: unknown): boolean =>
-  error instanceof Error &&
-  (error.name === "TimeoutError" || error.name === "AbortError");
-
-const readEndpoint = (connectionString: string): string | undefined => {
-  try {
-    return `https://${new URL(connectionString).hostname}${NEON_SQL_PATH}`;
-  } catch {
-    return undefined;
-  }
-};
-
-const readErrorCode = async (
-  response: Response
-): Promise<string | undefined> => {
-  try {
-    const body: unknown = await response.json();
-
-    if (typeof body !== "object" || body === null) {
-      return undefined;
-    }
-
-    const code = "code" in body ? body.code : undefined;
-
-    return typeof code === "string" ? code : undefined;
-  } catch (error) {
-    if (isTimeout(error)) {
-      throw error;
-    }
-
-    return undefined;
-  }
-};
-
-const readRows = async (
-  response: Response
-): Promise<readonly Record<string, unknown>[] | undefined> => {
-  try {
-    const body: unknown = await response.json();
-
-    if (typeof body !== "object" || body === null) {
-      return undefined;
-    }
-
-    const rows = "rows" in body ? body.rows : undefined;
-
-    if (!Array.isArray(rows)) {
-      return undefined;
-    }
-
-    return rows.every((row) => typeof row === "object" && row !== null)
-      ? (rows as Record<string, unknown>[])
-      : undefined;
-  } catch (error) {
-    if (isTimeout(error)) {
-      throw error;
-    }
-
-    return undefined;
-  }
-};
-
-const runStatement = async (
-  event: string,
-  context: Record<string, unknown>,
-  statement: NeonStatement,
-  timeoutMs: number
-): Promise<NeonOutcome> => {
-  const connectionString = readEnv("DATABASE_URL");
-
-  if (connectionString === undefined) {
-    return { ok: false, reason: "not_configured" };
-  }
-
-  const endpoint = readEndpoint(connectionString);
-
-  if (endpoint === undefined) {
-    logFailure(event, { ...context, reason: "bad_config" });
-
-    return { ok: false, reason: "bad_config" };
-  }
-
-  const startedAt = Date.now();
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        [CONNECTION_HEADER]: connectionString,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(statement),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-
-    const requestId = response.headers.get(REQUEST_ID_HEADER);
-
-    if (!response.ok) {
-      logFailure(event, {
-        ...context,
-        reason: "upstream_rejected",
-        status: response.status,
-        code: await readErrorCode(response),
-        requestId,
-        elapsedMs: Date.now() - startedAt,
-      });
-
-      return { ok: false, reason: "upstream_rejected" };
-    }
-
-    const rows = await readRows(response);
-
-    if (rows === undefined) {
-      logFailure(event, {
-        ...context,
-        reason: "response_unreadable",
-        status: response.status,
-        requestId,
-        elapsedMs: Date.now() - startedAt,
-      });
-
-      return { ok: false, reason: "response_unreadable" };
-    }
-
-    return { ok: true, rows };
-  } catch (error) {
-    if (isTimeout(error)) {
-      logFailure(event, {
-        ...context,
-        reason: "timeout",
-        timeoutMs,
-        elapsedMs: Date.now() - startedAt,
-      });
-
-      return { ok: false, reason: "timeout" };
-    }
-
-    logFailure(event, {
-      ...context,
-      reason: "network_error",
-      errorName: error instanceof Error ? error.name : "unknown",
-      elapsedMs: Date.now() - startedAt,
-    });
-
-    return { ok: false, reason: "network_error" };
-  }
 };
 
 const readAttemptKey = (envelope: OrderEnvelope): string | undefined =>
@@ -284,6 +114,20 @@ const readPrior = (row: Record<string, unknown>): PriorAttempt | undefined => {
     ageSeconds: readNumber(row, "prior_age_seconds"),
   };
 };
+
+interface RowParams {
+  contentHash: string;
+  key: string | null;
+  schemaVersion: number;
+  payload: string;
+}
+
+const readRowParams = (attempt: OrderAttempt): RowParams => ({
+  contentHash: attempt.contentHash,
+  key: readAttemptKey(attempt.envelope) ?? null,
+  schemaVersion: readSchemaVersion(attempt.envelope),
+  payload: JSON.stringify(attempt.envelope),
+});
 
 export const attemptLogFields = (
   attempt: OrderAttempt
@@ -326,17 +170,18 @@ export const readDedupeVerdict = (
 export const recordAttempt = async (
   attempt: OrderAttempt
 ): Promise<RecordResult> => {
+  const record = readRowParams(attempt);
   const outcome = await runStatement(
     "order_store_unavailable",
     attemptLogFields(attempt),
     {
       query: RECORD_STATEMENT,
       params: [
-        attempt.contentHash,
-        readAttemptKey(attempt.envelope) ?? null,
+        record.contentHash,
+        record.key,
         attempt.attemptId,
-        readSchemaVersion(attempt.envelope),
-        JSON.stringify(attempt.envelope),
+        record.schemaVersion,
+        record.payload,
       ],
     },
     STORE_QUERY_TIMEOUT_MS
@@ -364,6 +209,7 @@ export const markAttempt = async (
   attempt: OrderAttempt,
   outcome: AttemptOutcome
 ): Promise<MarkResult> => {
+  const mark = readRowParams(attempt);
   const result = await runStatement(
     "order_store_mark_failed",
     attemptLogFields(attempt),
@@ -371,10 +217,10 @@ export const markAttempt = async (
       query: MARK_STATEMENT,
       params: [
         attempt.attemptId,
-        attempt.contentHash,
-        readAttemptKey(attempt.envelope) ?? null,
-        readSchemaVersion(attempt.envelope),
-        JSON.stringify(attempt.envelope),
+        mark.contentHash,
+        mark.key,
+        mark.schemaVersion,
+        mark.payload,
         outcome.isDelivered ? "true" : "false",
         outcome.isDelivered ? (outcome.messageId ?? null) : null,
         outcome.isDelivered ? null : outcome.failure,
