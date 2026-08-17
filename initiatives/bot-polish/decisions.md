@@ -145,8 +145,12 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
   the same day).
 - **Decision.** `src/store.ts` talks to Neon's `/sql` endpoint with native `fetch` and
   the `Neon-Connection-String` header; no driver joins `package.json`; BD-1 remains
-  law. Timeout budgets derived from measurement: 4000 ms pre-send, 2500 ms post-send,
-  `maxDuration` 15 → 30.
+  law. Timeout budgets derived from measurement: 2000 ms pre-send (amended from 4000
+  at the B5 plan gate: a retry never meets a cold database — the first attempt wakes
+  it — so a cold-timeout skips a dedupe check that protects nothing real, while the
+  `attempt_id` late-write self-heals the audit row; the shorter box keeps the relay's
+  worst chain at 14.5 s under the shop route's unverified function ceiling), 2500 ms
+  post-send, `maxDuration` 15 → 30.
 - **Rationale.** Measured on the live database (`b5-neon-probe.md`): cold start
   863–921 ms (repeatable across a 9-minute and a 9-DAY suspend), warm p50 98 ms from
   iad1, errors are classifiable HTTP 400 JSON with SQLSTATE codes, 1 MB params pass,

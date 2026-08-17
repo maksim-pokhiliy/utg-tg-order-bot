@@ -33,7 +33,8 @@ the external half of every inequality gets measured before a step is designed).
 | 10 parallel `pg_sleep(0.2)`          | —                   | 398 ms wall → server executes in parallel, no pooler ceiling hit |
 | 256 KB / 1 MB string param           | —                   | 200 OK, 210/329 ms |
 
-Two cold samples, 863 and 921 ms, after idles of nine minutes and nine days — the
+Three cold samples — 863, 921 and 925 ms — after idles of nine minutes, nine days
+and one hour (the third caught live during the plan-gate Q3 validation) — the
 resume cost is repeatable, sub-second, and independent of how long the compute
 slept. Autosuspend is real and fires within ≤9 minutes of quiet (consistent with
 the free-plan 5-minute default), so **the cold path is the COMMON path for this
@@ -89,7 +90,20 @@ all succeeded from both vantage points. Probe tables (`b5_probe_scratch`,
 
 ## Derived design constants
 
-- Pre-send store timeout: **4000 ms** (> 4× the worst measured cold start).
+- Pre-send store timeout: **2000 ms** (> 2× the worst measured cold start; amended
+  from 4000 at the plan gate — rationale in BD-10).
 - Post-send mark timeout: **2500 ms**.
-- `maxDuration`: 15 → **30** (4 s store + 10 s Telegram + 2.5 s mark + headroom).
+- `maxDuration`: 15 → **30** (2 s store + 10 s Telegram + 2.5 s mark + headroom).
 - Transport: plain `fetch` — ratified as BD-10 on these numbers.
+
+## Plan-gate addendum (2026-08-18, planner)
+
+The executor's design moved the `dedupe_of` write into the pre-send statement via a
+scalar subquery in `VALUES` — a shape the original battery had validated only in
+`RETURNING`. Validated live at the gate on a scratch table: the subquery writes
+`dedupe_of` in the same roundtrip, an undelivered prior still never matches, the
+prior tuple (`sent_at`, key, hash, `floor`-age) returns alongside, and
+`prior_age_seconds` (int4) arrives as a JSON **number** while `int8` stays a
+string. The `attempt_id` mark-upsert was validated in both arms: late INSERT when
+the pre-send write was lost, and `on conflict do update` over an existing row
+(`case when $n::boolean then now() end` and `$n::bigint` casts included).
