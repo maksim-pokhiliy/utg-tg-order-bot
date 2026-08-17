@@ -26,6 +26,8 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
 | BD-7 | Quality floor: tsc + vitest + prettier + CI  | RATIFIED |
 | BD-8 | Single env; smoke in the REAL operators chat | RATIFIED |
 | BD-9 | Unknown `locale` degrades to uk style, not 400 | RATIFIED |
+| BD-10 | B5 talks to Neon over SQL-over-HTTP via plain `fetch` | RATIFIED |
+| BD-11 | Dedupe suppresses only confirmed-delivered twins | RATIFIED |
 
 ---
 
@@ -136,3 +138,41 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
   typecheck (exactly how `currency` arrived in shop PR #11 while this repo stood
   still); a 400 would silently lose 100% of that locale's orders, while degrading costs
   thousands-separator cosmetics in a scenario that does not yet exist.
+
+### BD-10 — B5 reaches Neon over SQL-over-HTTP with native `fetch`; zero-dependency stands
+
+- **Status:** RATIFIED (owner, 2026-08-18 — contour approval; probe falsifiers cleared
+  the same day).
+- **Decision.** `src/store.ts` talks to Neon's `/sql` endpoint with native `fetch` and
+  the `Neon-Connection-String` header; no driver joins `package.json`; BD-1 remains
+  law. Timeout budgets derived from measurement: 4000 ms pre-send, 2500 ms post-send,
+  `maxDuration` 15 → 30.
+- **Rationale.** Measured on the live database (`b5-neon-probe.md`): cold start
+  863–921 ms (repeatable across a 9-minute and a 9-DAY suspend), warm p50 98 ms from
+  iad1, errors are classifiable HTTP 400 JSON with SQLSTATE codes, 1 MB params pass,
+  concurrency does not serialize. The drivers' value — pg API, transactions, type
+  parsing for 100+ types — is unused by two fixed statements reading three fields:
+  `@neondatabase/serverless` is 432 KB for a wrapper around the same POST; `pg` adds
+  six transitive packages and a TCP model that pays a connection per invocation.
+  Named risk: `/sql` is Neon's driver-internal protocol with no independent SLA.
+  Mitigation: one module behind fail-open — a protocol break costs audit rows, never
+  orders — and fixtures pin the captured shapes so a drift is a red test, not a
+  mystery. Falsifiers checked and cleared: endpoint availability on this project,
+  cold latency, error classifiability.
+
+### BD-11 — dedupe suppresses only confirmed-delivered twins; hash leads, key corroborates
+
+- **Status:** RATIFIED (owner, 2026-08-18 — contour approval).
+- **Decision.** A retry is suppressed iff the content hash matches AND the prior row
+  is confirmed delivered (`sent_at not null`) AND both idempotency keys are present
+  and equal AND the prior lies within a 30-minute window. The hash canon EXCLUDES the
+  key. v1 (keyless) traffic is stored but never suppressed. Ambiguous send outcomes
+  (`ack_unreadable`, `timeout`) are not delivery — a retry after one sends again.
+  Suppression answers the byte-exact frozen 200 without touching Telegram.
+- **Rationale.** The cost asymmetry rules: a false suppression silently loses a real
+  order (the exact class this initiative exists to kill — and BDEF-9's edited-order
+  scenario is a false suppression by construction), while a false send costs one
+  duplicate message the operators reconcile by phone (BDEF-3's own bounded-harm
+  analysis). Hence every condition errs toward sending: short window, key must
+  corroborate, unconfirmed delivery never suppresses, and the store being down makes
+  the relay behave as if dedupe did not exist.
