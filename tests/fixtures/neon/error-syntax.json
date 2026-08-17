@@ -1,0 +1,6 @@
+{
+  "message": "syntax error at or near \"selec\"",
+  "code": "42601",
+  "severity": "ERROR",
+  "neon:retryable": false
+}

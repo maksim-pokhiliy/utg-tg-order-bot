@@ -1,0 +1,23 @@
+{
+  "fields": [
+    { "name": "id", "dataTypeID": 20, "format": "text" },
+    { "name": "dupe_of", "dataTypeID": 20, "format": "text" },
+    { "name": "prior_sent_at", "dataTypeID": 1184, "format": "text" },
+    { "name": "prior_idempotency_key", "dataTypeID": 25, "format": "text" },
+    { "name": "prior_content_hash", "dataTypeID": 25, "format": "text" },
+    { "name": "prior_age_seconds", "dataTypeID": 23, "format": "text" }
+  ],
+  "rows": [
+    {
+      "id": "1",
+      "dupe_of": null,
+      "prior_sent_at": null,
+      "prior_idempotency_key": null,
+      "prior_content_hash": null,
+      "prior_age_seconds": null
+    }
+  ],
+  "command": "INSERT",
+  "rowCount": 1,
+  "rowAsArray": false
+}
