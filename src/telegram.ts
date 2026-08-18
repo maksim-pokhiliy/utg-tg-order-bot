@@ -12,12 +12,15 @@ export type SendFailure =
   | "timeout"
   | "network_error";
 
-export type SendResult = { ok: true } | { ok: false; reason: SendFailure };
+export type SendResult =
+  | { ok: true; messageId: number | undefined }
+  | { ok: false; reason: SendFailure };
 
 interface TelegramVerdict {
   isAccepted: boolean;
   isReadable: boolean;
   errorCode: number | undefined;
+  messageId: number | undefined;
 }
 
 const logEvent = (event: string, detail: Record<string, unknown>): void => {
@@ -36,23 +39,41 @@ const readVerdict = async (response: Response): Promise<TelegramVerdict> => {
     const body: unknown = await response.json();
 
     if (typeof body !== "object" || body === null) {
-      return { isAccepted: false, isReadable: false, errorCode: undefined };
+      return {
+        isAccepted: false,
+        isReadable: false,
+        errorCode: undefined,
+        messageId: undefined,
+      };
     }
 
     const isAccepted = "ok" in body && body.ok === true;
     const rawCode = "error_code" in body ? body.error_code : undefined;
+    const rawResult = "result" in body ? body.result : undefined;
+    const rawId =
+      typeof rawResult === "object" &&
+      rawResult !== null &&
+      "message_id" in rawResult
+        ? rawResult.message_id
+        : undefined;
 
     return {
       isAccepted,
       isReadable: true,
       errorCode: typeof rawCode === "number" ? rawCode : undefined,
+      messageId: Number.isSafeInteger(rawId) ? Number(rawId) : undefined,
     };
   } catch (error) {
     if (isTimeout(error)) {
       throw error;
     }
 
-    return { isAccepted: false, isReadable: false, errorCode: undefined };
+    return {
+      isAccepted: false,
+      isReadable: false,
+      errorCode: undefined,
+      messageId: undefined,
+    };
   }
 };
 
@@ -74,6 +95,7 @@ export const sendOrderMessage = async (text: string): Promise<SendResult> => {
       `${TELEGRAM_API_ORIGIN}/bot${token}/sendMessage`,
       {
         method: "POST",
+        redirect: "error",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId,
@@ -110,7 +132,7 @@ export const sendOrderMessage = async (text: string): Promise<SendResult> => {
       return { ok: false, reason: "upstream_not_ok" };
     }
 
-    return { ok: true };
+    return { ok: true, messageId: verdict.messageId };
   } catch (error) {
     if (isTimeout(error)) {
       logEvent("telegram_timeout", { timeoutMs: REQUEST_TIMEOUT_MS });

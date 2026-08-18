@@ -78,6 +78,7 @@ The relay requires only what it cannot render an order without: `delivery.mode`,
 | Situation                                                          | Status | Body                   |
 | ------------------------------------------------------------------ | ------ | ---------------------- |
 | relayed to Telegram                                                | `200`  | `{"status":"success"}` |
+| suppressed as a duplicate of a delivered order                     | `200`  | `{"status":"success"}` |
 | malformed payload                                                  | `400`  | `{"status":"error"}`   |
 | `ORDER_RELAY_SECRET` configured and the header is missing or wrong | `401`  | `{"status":"error"}`   |
 | bot not configured, or Telegram refused / was unreachable          | `500`  | `{"status":"error"}`   |
@@ -104,13 +105,81 @@ Normalization is visible in a few places, by design. The numero sign folds, so a
 
 Stripping format characters costs some emoji their composition, and that is a real consequence rather than a theoretical one. The zero-width joiner is a format character, so `👨‍👩‍👧` arrives as three separate glyphs and `🏳️‍🌈` as two; a tag-sequence flag degrades to its base `🏴`. Variation selectors are marks rather than format characters, so an ordinary emoji keeps its presentation. Every one of these is pinned by a test — they are accepted costs of removing the bidi overrides and zero-width padding that were misleading operators, not oversights.
 
+## Persistence
+
+Set `DATABASE_URL` and the relay writes every decoded order to Postgres **before** it calls Telegram, over Neon's SQL-over-HTTP endpoint with the platform's own `fetch` — no driver, no dependency. Leave it unset and none of this happens: no database call, and none of the five store events in any log line — `order_stored`, `order_deduplicated`, `order_store_unavailable`, `order_store_mark_failed`, `order_store_prior_unreadable`.
+
+The connection string's host must sit under `neon.tech`; anything else is refused as a misconfiguration before a request is made, so a mistyped or tampered value cannot send the credential somewhere new.
+
+Three rules govern the store. Each is pinned by a named test, and each pin was checked by mutation — breaking the rule in the source was confirmed to redden the test rather than merely assumed to.
+
+**The store never gates the send.** A database that is dead, slow, missing its table or misconfigured costs an audit row — never an order, and never a different answer to the shop. Every failure is one structured log line and the flow continues as though the store did not exist. That includes the case where the migration has not been applied yet: the missing table comes back as SQLSTATE `42P01`, the relay fails open, and the log names the cause. Either deploy order is therefore safe.
+
+**Duplicates are recognised by content, never by the idempotency key alone.** The shop mints that key on first submit and clears it only after a success, so it deliberately spans an order the buyer _edited_ between attempts. Suppressing on the key would answer `200` to a corrected order that was never delivered, and the shop would show the success screen and empty the cart. So identity is a sha256 over a canonical serialization of the decoded order with the key removed, and the key is only corroborating evidence.
+
+**What is stored is the decoded order, not the message.** The Telegram message is a lossy view — it truncates, and truncation hides cart lines behind a marker. The record is what the decoder returned.
+
+### What is and is not suppressed
+
+A retry is suppressed only when _all four_ of these hold: the content hash matches, the earlier attempt is confirmed delivered, both idempotency keys are present and equal, and the earlier attempt is less than 30 minutes old. Everything else is delivered again. Concretely:
+
+- **Suppressed:** the same order re-POSTed under the same key within half an hour of a confirmed delivery. The relay answers the byte-identical `200` and never calls Telegram.
+- **Not suppressed:** an order whose cart or total changed, even under the same key — this is the whole reason identity is the hash.
+- **Not suppressed:** a retry after an _ambiguous_ outcome (Telegram accepted but the acknowledgement was unreadable, or the call timed out). An unconfirmed send is not a delivery. A duplicate message is something the operators reconcile in a phone call; an order silently swallowed is not.
+- **Not suppressed:** anything older than the window, anything without a key on both sides, and every v1 order — v1 carries no key at all, so v1 traffic is recorded but never deduplicated.
+- **Not suppressed:** two identical requests racing each other. Both may find no prior and both may send. This is a bounded, accepted non-goal — locking would trade a duplicate message for a possibly lost order, which is the wrong direction.
+
+Every condition errs toward sending, because the two mistakes are not equally expensive.
+
+### Replay after an incident
+
+Two queries, because the rows they return want opposite defaults. **The split is not "did we record a failure" — it is "do we know Telegram never saw it".** Three of the six failure reasons are ambiguous rather than confirmed: `ack_unreadable` means Telegram answered `200` with a body we could not parse (it almost certainly posted), and `timeout` and `network_error` both leave open whether the request was written before the connection died.
+
+```sql
+select payload from orders
+where sent_at is null
+  and not (dedupe_of is not null and send_failure is null)
+  and send_failure in ('config_missing', 'upstream_rejected', 'upstream_not_ok');
+```
+
+These are the confirmed non-deliveries: the bot was unconfigured, or Telegram actively refused the message. Replaying them is safe.
+
+```sql
+select payload from orders
+where sent_at is null
+  and not (dedupe_of is not null and send_failure is null)
+  and (send_failure is null
+       or send_failure in ('ack_unreadable', 'timeout', 'network_error'));
+```
+
+These are ambiguous — either the outcome was never recorded, or it was recorded as one of the three reasons that do not prove non-delivery. The message may or may not have arrived. A human reconciles these against the chat before replaying anything.
+
+Note what the conditions exclude, and why the exclusion is written the awkward way. A suppressed attempt keeps `sent_at` null on purpose (it was never itself delivered, and letting it count as one would roll the window forward under a retry storm), so something has to keep replays from re-sending orders that _were_ delivered — filtering on `sent_at is null` alone would do exactly that. But `dedupe_of is null` is the wrong instrument, because `dedupe_of` records what the SQL predicate matched while suppression is decided in TypeScript. A suppressed attempt is precisely one with a back-reference **and** no send recorded against it, which is what `not (dedupe_of is not null and send_failure is null)` says. On today's code the two cannot disagree — the TypeScript check is a strict re-verification of the SQL one, so every row `dedupe_of is null` would exclude is a duplicate that was genuinely delivered. The longer condition costs nothing and stops being merely equivalent the moment the column parsing drifts, which is exactly when a replay would matter.
+
+### The shape of the record
+
+`migrations/001_orders.sql` holds the schema; it is applied out of band and is never executed by the code or by CI. Rows are append-only — the only columns any later write touches are `sent_at`, `telegram_message_id` and `send_failure`.
+
+Two limits worth knowing. A serialized order over 262 144 characters is **not** stored: the relay logs `payload_too_large` and carries on, because a store that can refuse an order is worse than a store with a gap in it. And a row written late — the recovery path where the pre-send insert never landed and the post-send mark inserts the whole row instead — stamps `received_at` at mark time rather than receipt time, so its dedupe window can run up to about fifteen seconds long. Both are deliberate.
+
+`payload` is `text`, not `jsonb`, deliberately. Postgres `jsonb` rejects two things the decoders accept and the shop can send: a NUL character and an unpaired surrogate. Under `jsonb` those orders would relay fine and then be silently dropped by the store — precisely the hostile inputs worth having a record of. `text` always accepts them.
+
+One consequence to know before you reach for it: a `payload::jsonb` cast is **not** a safe ad-hoc tool here. Postgres aborts the whole statement on the first value it cannot convert, so a single row a buyer planted weeks ago takes down the entire result set, not just its own row. The replay queries above return `payload` as text and are unaffected. If you do need to look inside, filter to the rows you want first and expect the cast to fail on some of them.
+
+### This is a store of personal data
+
+Once `DATABASE_URL` is set, buyer names, phone numbers and delivery addresses live in Postgres, where previously they existed only in the operators' chat. **There is no retention or erasure policy yet, and rows accumulate indefinitely** — that work is deliberately out of scope here and is tracked as a carry-forward. Logs remain clean: the store logs SQLSTATE codes (validated against the five-character SQLSTATE shape, so an upstream that puts prose in that field cannot smuggle it into a log line), HTTP status, Neon's request id, timings, row ids, JavaScript error class names, and short prefixes of the content hash and idempotency key for correlation — never a payload value, never the connection string or any fragment of it, never a full hash or key, and never Neon's own `message`/`detail`/`hint`, which can quote both SQL and parameter content.
+
+Two access facts worth stating plainly, since the migration does nothing about either: the relay authenticates with whatever role `DATABASE_URL` names, and that role currently owns the schema rather than holding the three grants the relay actually needs; and the rows carry no encryption, pseudonymisation or row-level policy.
+
 ## Environment
 
-| Variable             | Required | Purpose                                                                                                                                                           |
-| -------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TELEGRAM_BOT_TOKEN` | yes      | Bot API token; without it every request answers `500`                                                                                                             |
-| `TELEGRAM_CHAT_ID`   | yes      | destination chat for order messages                                                                                                                               |
-| `ORDER_RELAY_SECRET` | no       | when set, callers must send a matching `x-relay-secret` header. Unset, empty, or whitespace-only means enforcement is off and the relay behaves exactly as before |
+| Variable             | Required | Purpose                                                                                                                                                                                                                                                             |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN` | yes      | Bot API token; without it every request answers `500`                                                                                                                                                                                                               |
+| `TELEGRAM_CHAT_ID`   | yes      | destination chat for order messages                                                                                                                                                                                                                                 |
+| `ORDER_RELAY_SECRET` | no       | when set, callers must send a matching `x-relay-secret` header. Unset, empty, or whitespace-only means enforcement is off and the relay behaves exactly as before                                                                                                   |
+| `DATABASE_URL`       | no       | Postgres connection string. When set, every decoded order is recorded before the send and duplicates are suppressed; unset, empty or whitespace-only means the relay behaves exactly as it did before persistence existed — zero database calls, zero new log lines |
 
 There is deliberately no local `.env` and no `.env.example` holding real values — the variables live in the Vercel project. Never commit secrets.
 
@@ -133,7 +202,7 @@ CI runs one battery on every pull request and every push to `master`: install �
 
 ## Deployment
 
-Vercel project `telegram-bot-server`, auto-deploying `master`. `vercel.json` carries two things: the `/place_order` → `/api/place_order` rewrite, and a `maxDuration` set above the outgoing request timeout so the relay's own timeout is the one that fires. Everything else is zero-config.
+Vercel project `telegram-bot-server`, auto-deploying `master`. `vercel.json` carries two things: the `/place_order` → `/api/place_order` rewrite, and a `maxDuration` set above everything the invocation can spend upstream, so the relay's own timeouts are the ones that fire. There are three of those now — 2 s for the pre-send record, 10 s for Telegram, 2.5 s for the post-send mark — and a test asserts `maxDuration` clears their sum with room left over for the work outside the boxes. Everything else is zero-config.
 
 `.vercelignore` decides what reaches the deployment, and it is an **allowlist**: everything at the root is excluded, and only `api/`, `src/` and the build manifests are added back. **If you add a source directory the function imports from, add it there too** — a missing entry still typechecks, still passes the load smoke and still builds, and then the deployed lambda dies on its first request. `tests/vercelignore.test.ts` derives the directories the compiled module graph actually reaches and fails CI when one of them is not shipped, so that is caught before production rather than by it.
 
