@@ -107,7 +107,7 @@ Stripping format characters costs some emoji their composition, and that is a re
 
 ## Persistence
 
-Set `DATABASE_URL` and the relay writes every decoded order to Postgres **before** it calls Telegram, over Neon's SQL-over-HTTP endpoint with the platform's own `fetch` — no driver, no dependency. Leave it unset and none of this happens: no database call, and none of the four store events in any log line.
+Set `DATABASE_URL` and the relay writes every decoded order to Postgres **before** it calls Telegram, over Neon's SQL-over-HTTP endpoint with the platform's own `fetch` — no driver, no dependency. Leave it unset and none of this happens: no database call, and none of the five store events in any log line — `order_stored`, `order_deduplicated`, `order_store_unavailable`, `order_store_mark_failed`, `order_store_prior_unreadable`.
 
 The connection string's host must sit under `neon.tech`; anything else is refused as a misconfiguration before a request is made, so a mistyped or tampered value cannot send the credential somewhere new.
 

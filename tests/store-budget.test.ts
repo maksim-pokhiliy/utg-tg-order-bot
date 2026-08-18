@@ -3,7 +3,11 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-import { STORE_MARK_TIMEOUT_MS, STORE_QUERY_TIMEOUT_MS } from "../src/store.js";
+import {
+  MAX_PAYLOAD_CHARS,
+  STORE_MARK_TIMEOUT_MS,
+  STORE_QUERY_TIMEOUT_MS,
+} from "../src/store.js";
 import { REQUEST_TIMEOUT_MS } from "../src/telegram.js";
 
 const MS_PER_SECOND = 1000;
@@ -43,6 +47,10 @@ const readMaxDuration = (): number => {
 describe("the relay's time budget", () => {
   it("keeps the pre-send box at the amended two seconds", () => {
     expect(STORE_QUERY_TIMEOUT_MS).toBe(2000);
+  });
+
+  it("keeps the stored-payload cap where the operators were told it is", () => {
+    expect(MAX_PAYLOAD_CHARS).toBe(262_144);
   });
 
   it("gives the post-send mark its own, slightly longer box", () => {

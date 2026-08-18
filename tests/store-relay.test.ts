@@ -87,6 +87,21 @@ describe("the relay with no store configured", () => {
     expect(joinAllLogged(logs)).not.toContain("order_");
   });
 
+  it("stays silent about an oversized order when no store is configured", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    const stub = stubRelayFetch();
+    const huge = "я".repeat(300_000);
+
+    const response = await POST(
+      new StubRequest(buildOrderV2({ comment: huge }))
+    );
+
+    expect(response.status).toBe(200);
+    expect(stub).toHaveBeenCalledTimes(1);
+    expect(joinAllLogged(logs)).not.toContain("order_store");
+    expect(joinAllLogged(logs)).not.toContain("payload_too_large");
+  });
+
   it("stays dark when the connection string is whitespace only", async () => {
     vi.stubEnv("DATABASE_URL", "  \n ");
     const stub = stubRelayFetch();

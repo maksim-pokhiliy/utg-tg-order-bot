@@ -8,6 +8,7 @@ const readRepoFile = (relative: string): string =>
 
 const storeSource = readRepoFile("../src/store.ts");
 const migration = readRepoFile("../migrations/001_orders.sql");
+const neonSource = readRepoFile("../src/neon.ts");
 
 describe("the pre-send statement", () => {
   it("still narrows on the content hash and the idempotency key", () => {
@@ -174,6 +175,17 @@ describe("the post-send mark", () => {
     expect(storeSource).toContain(
       "values ($1, $2, $3, $4, $5, case when $6::boolean then now() end, $7, $8)"
     );
+  });
+});
+
+describe("the transport", () => {
+  it("boxes each statement in exactly the budget it was handed", () => {
+    expect(neonSource).toContain("signal: AbortSignal.timeout(timeoutMs),");
+    expect(neonSource).not.toMatch(/AbortSignal\.timeout\(timeoutMs\s*[*/+-]/u);
+  });
+
+  it("checks configuration before it does any work on the payload", () => {
+    expect(neonSource).toContain("export const isStoreConfigured");
   });
 });
 

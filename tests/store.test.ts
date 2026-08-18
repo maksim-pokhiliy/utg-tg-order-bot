@@ -452,6 +452,9 @@ describe("the post-send mark", () => {
 
     expect(call?.query).toContain("on conflict (attempt_id) do update");
     expect(call?.params[0]).toBe(attempt.attemptId);
+    expect(call?.params[1]).toBe(attempt.contentHash);
+    expect(call?.params[2]).toBe(PINNED_KEY);
+    expect(call?.params[3]).toBe(2);
     expect(call?.params[5]).toBe("true");
     expect(call?.params[6]).toBe(4242);
     expect(call?.params[7]).toBeNull();
@@ -484,6 +487,22 @@ describe("the post-send mark", () => {
     expect(call?.params[3]).toBe(2);
     expect(call?.params[4]).toBe(JSON.stringify(attempt.envelope));
     expect(call?.params[6]).toBeNull();
+  });
+
+  it("refuses to mark an oversized payload rather than sending it twice", async () => {
+    const stub = stubRelayFetch();
+    const huge = "я".repeat(MAX_PAYLOAD_CHARS);
+
+    await expect(
+      markAttempt(createAttempt(buildEnvelopeV2({ comment: huge })), {
+        isDelivered: true,
+        messageId: 1,
+      })
+    ).resolves.toEqual({ ok: false, reason: "payload_too_large" });
+
+    expect(stub).not.toHaveBeenCalled();
+    expect(joinAllLogged(logs)).toContain("order_store_mark_failed");
+    expect(joinAllLogged(logs)).toContain("payload_too_large");
   });
 
   it("fails open with its own event when the mark cannot land", async () => {

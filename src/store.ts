@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { runStatement, type StoreFailure } from "./neon.js";
+import { isStoreConfigured, runStatement, type StoreFailure } from "./neon.js";
 import { hashOrder } from "./orderHash.js";
 import type { OrderEnvelope } from "./payloadV2.js";
 import type { SendFailure } from "./telegram.js";
@@ -210,6 +210,10 @@ const isTooLarge = (
 export const recordAttempt = async (
   attempt: OrderAttempt
 ): Promise<RecordResult> => {
+  if (!isStoreConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
   const record = readRowParams(attempt);
 
   if (
@@ -252,6 +256,10 @@ export const markAttempt = async (
   attempt: OrderAttempt,
   outcome: AttemptOutcome
 ): Promise<MarkResult> => {
+  if (!isStoreConfigured()) {
+    return { ok: false, reason: "not_configured" };
+  }
+
   const mark = readRowParams(attempt);
 
   if (isTooLarge("order_store_mark_failed", mark, attemptLogFields(attempt))) {

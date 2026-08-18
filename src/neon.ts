@@ -23,6 +23,9 @@ export type NeonOutcome =
   | { ok: true; rows: readonly Record<string, unknown>[] }
   | { ok: false; reason: StoreFailure };
 
+export const isStoreConfigured = (): boolean =>
+  readEnv("DATABASE_URL") !== undefined;
+
 const logFailure = (event: string, detail: Record<string, unknown>): void => {
   console.warn(JSON.stringify({ event, ...detail }));
 };
