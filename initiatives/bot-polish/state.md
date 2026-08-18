@@ -1,7 +1,7 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-18 (B5 in flight — contour ratified, Neon probed live, BD-10/BD-11
-ratified, executor prompt committed and the executor running)
+**Updated:** 2026-08-18 (B5 CLOSED — merged `1d31e20`, prod-smoked through the live shop
+chain, dedupe proven on real rows; the bot board B1–B5 is complete)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -14,24 +14,28 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 | B2  | Shop-side secret sender + env enablement                        | ✅ shipped — shop PR #20 `bb3f866`, enforcement live and verified | shop journal 2026-08-06 |
 | B3  | Relay dual-accepts v1 + v2 payloads                             | ✅ shipped — PR #2 `66134ee`, both paths prod-smoked | journal 2026-08-06 |
 | B4  | Message-width truth: UTF-16 budget + misleading characters      | ✅ shipped — PR #3 `7594e94`, premise falsified mid-flight, merged on the narrower claim | journal 2026-08-08 · BDEF-4 / BDEF-5 |
-| B5  | Orders persisted to Postgres before the Telegram send           | 🔄 in flight — contour ratified, probes done, executor running | `step-b5-persistence-prompt.md` · `b5-neon-probe.md` · BD-10/BD-11 |
+| B5  | Orders persisted to Postgres before the Telegram send           | ✅ shipped — PR #4 `1d31e20`, migration applied pre-merge, three-part smoke through the prod shop route, dedupe + BDEF-9 proven on real rows | journal 2026-08-18 · BD-10/BD-11 · `b5-neon-probe.md` |
 
 ## Next action
 
-**B5 IN FLIGHT (2026-08-18).** Contour ratified by the owner; the Neon live probe ran
-FIRST (D-12 discipline) and its numbers killed the scary unknowns: cold start 863–921 ms
-repeatable across a 9-minute and a 9-day suspend, warm p50 98 ms from iad1, errors
-classifiable, the dedupe CTE validated end-to-end on the real database — full report in
-`b5-neon-probe.md`. Transport ratified as BD-10 (plain `fetch`, zero-dependency stands),
-dedupe semantics as BD-11 (suppress only confirmed-delivered twins; hash leads, key
-corroborates, 30-minute window; ambiguous outcomes are not delivery; v1 never suppresses).
-The executor prompt is committed (`step-b5-persistence-prompt.md`); the executor runs the
-full `/feature` pipeline headless. Session rule granted by the owner for THIS run only:
-no ceremony around temporary projects/tables in the production environment — re-ask next
-time. Planner still owes: the pre-merge migration run against prod Neon, the post-merge
-smoke (two delivered TEST messages + one suppressed duplicate — owner-sanctioned
-extension of BD-8), deletion of the throwaway `neon-probe-fn` Vercel project, and the
-close-out docs promotion (BDEF-3 + BDEF-9 move to CLOSED there).
+**The bot board is COMPLETE** — B1–B5 all shipped, prod-verified and smoked. B5 closed
+2026-08-18: every decoded order is written to Neon before the Telegram send, confirmed
+retry-duplicates are suppressed by content identity, and a dead database provably costs
+an audit row, never an order (458 tests, 34 mutation gates, deep review 67 pre-cap → 19,
+the BDEF-9 scenario proven live on production rows — journal 2026-08-18).
+
+**What remains is not a bot step:**
+
+- **U6** (the paired contract close: bot drops v1, both repos pin v2 in one step) —
+  shop+bot window, carries BDEF-6/7 and the BDEF-2 hygiene batch. Owner decides when.
+- **BDEF-11** — swap the relay's Neon role for a scoped one (INSERT/SELECT/UPDATE on
+  `orders` only); planner ops, near-term, needs a Vercel env update + redeploy of the
+  serving deployment (the BDEF-1 lesson applies).
+- **BDEF-8** (the enforced Telegram width metric, ~980 units of cart room) — a direct
+  Bot API probe, planner-owned, any time.
+- Owner calls parked: whether to rotate the `DATABASE_URL` password (it crossed the
+  owner's terminal and the planner's scratchpad during B5, same class as the B1 bot-token
+  note); whether bot-polish now runs `/initiative-close` or stays open to host U6.
 
 ## Open decisions awaiting ratification
 

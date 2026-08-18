@@ -22,14 +22,19 @@ one message and sends it to the operators' chat via the Telegram Bot API
 Deployed as Vercel project `telegram-bot-server`, auto-deploys `master`. **LIVE — real
 volunteer orders flow through this relay**; every merge must leave it fully functional.
 
-Current state (post `bot-polish` B1, merged 2026-08-03): a typed zero-dependency
+Current state (post `bot-polish` B5, merged 2026-08-18): a typed zero-dependency
 Vercel function (`api/place_order.ts` + `src/*`) with a vitest suite, a CI battery
-and an ESM load smoke; B2 (shop-side secret sender + env enablement) is next (see
-`initiatives/bot-polish/`).
+and an ESM load smoke. The relay dual-accepts the v1 and v2 payloads, authenticates
+callers, sanitizes and width-bounds the message, and persists every decoded order to
+Neon Postgres BEFORE the Telegram send (append-only `orders` table, content-hash
+dedupe of confirmed-delivered retries, fail-open by law: a dead database costs an
+audit row, never an order). The whole bot board B1–B5 is shipped; see
+`initiatives/bot-polish/`.
 
 Env (set in Vercel, no local `.env`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
-`ORDER_RELAY_SECRET` (optional; shipped in B1 as enforcement-if-configured, the
-enablement is B2) gates callers when set.
+`ORDER_RELAY_SECRET` (optional) gates callers when set; `DATABASE_URL` (optional,
+Sensitive) enables the order store + dedupe — unset, the relay behaves exactly as
+before B5 with zero store traffic.
 
 ## The sacred contract
 

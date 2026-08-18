@@ -371,3 +371,68 @@ Append-only. One entry per session/step.
 - Planner verification: battery re-run by hand, corpus fixture blob compared across four
   refs (identical), and a mutation planted at the sanitize/escape boundary — 4 tests red,
   restored byte-identical.
+
+## 2026-08-18 — B5 closed: orders are durable; the bot board is complete
+
+- **B5 CLOSED** (PR #4 `1d31e20`, squash-merged, prod deployed). Every decoded order is
+  written to Neon BEFORE the Telegram send; a confirmed-delivered twin inside the window
+  suppresses the retry; a dead store provably costs an audit row, never an order. 350 →
+  458 tests; a 34-row mutation table; closes BDEF-3 and executes BDEF-9.
+- **Probes came FIRST this time** (the B4 lesson, applied): before any design was frozen,
+  the planner measured Neon SQL-over-HTTP from two vantage points on the LIVE database —
+  cold resume sub-second and repeatable (863/921/925/1131 ms across nine-minute,
+  nine-day and one-hour idles), warm p50 98 ms from iad1, error shapes captured verbatim,
+  1 MB params passing, and the dedupe CTE validated end-to-end on the production table
+  before the executor prompt existed (`b5-neon-probe.md`). BD-10 (plain `fetch`,
+  zero-dependency stands) and BD-11 (suppress only confirmed-delivered twins; hash
+  leads, key corroborates, 30-minute window; ambiguous outcomes are NOT delivery; v1
+  never suppresses) were ratified on those numbers, and the pre-send budget was amended
+  4000 → 2000 ms at the plan gate on the observation that a retry never meets a cold
+  database — the first attempt is what wakes it.
+- **The plan gate falsified two prompt claims at source** — no `maxDuration` pin ever
+  existed (the stronger three-budget inequality was written instead), and `jsonb` would
+  have silently rejected exactly the hostile payloads the audit exists for (U+0000, lone
+  surrogates — both accepted by the decoders), so the durable column is TEXT. The
+  executor's "SQL narrows, TypeScript decides" ruling made the dedupe laws mutation-
+  provable in a repo whose CI cannot execute SQL; the planner live-validated the
+  VALUES-subquery and the `attempt_id` mark-upsert at the gate rather than trusting
+  either.
+- **The independent review was the only independence this branch got, and it earned it.**
+  The executor's internal refute/break phases never ran (its finder panel stalled the
+  session's one watchdog kill); the fresh-context deep review pooled 67 candidates →
+  19 findings, three blocking: the connection string decided WHICH HOST received the
+  database password (now pinned to `.neon.tech` — the probe had proven the host is
+  cosmetic for routing, so the pin costs nothing); the store's timeout was structurally
+  unobservable by any test (deleting the `signal:` line shipped 441/441 green while a
+  hung Neon killed the invocation at `maxDuration` — a Law-1 violation the whole battery
+  blessed); and the mark statement's VALUES ordering was unpinned. It also falsified the
+  size-cap deferral premise in the shop's own source: the forwarding route is public and
+  attaches the relay secret for any caller. The delta pass then caught a regression the
+  fix round itself introduced (the new size cap ran ahead of the config gate, breaking
+  dark-when-unset) — the third consecutive step where reviewing the fixes paid.
+- **Planner verification stayed independent of every report**: battery re-runs at each
+  round, the PR file list clean of planner artifacts, byte-identity of untouched test
+  support confirmed by blob SHA, and the three decisive mutations re-proven by hand
+  (gate reorder, `timeoutMs * 100`, cap raise — each red on exactly one named test,
+  each restored to a clean tree).
+- **Rollout order held**: migration applied to production Neon BEFORE the merge, with
+  both shipped statements executed verbatim against the real table (including the raw
+  JSON number bound to `$7`); `DATABASE_URL` was already bound, so the merge was the
+  enablement. BD-8 smoke ran THROUGH THE PRODUCTION SHOP ROUTE (the planner holds no
+  relay secret — the shop attaches it, which exercised the full live chain): secretless
+  direct POST → 401; order A delivered (message 12, 2.96 s — the full cold chain);
+  byte-identical retry → 200 in 0.66 s with NO message and `dedupe_of` set; the
+  edited cart under the SAME key → DELIVERED (message 13) — BDEF-9's exact scenario,
+  proven on production rows. All three dispositions verified in SQL; the smoke rows were
+  then deleted and the table left at zero for real orders.
+- **Tooling lessons for the retro, both real incidents**: an executor must never block a
+  turn waiting on its subagents (the B1 lesson recurred one level up — the stream
+  watchdog killed a healthy run whose panel was still grinding); and scratch tooling
+  needs session-unique names plus mutations that PROVE they landed — the reviewer's
+  harness overwrote the executor's mutation script mid-session, and every "gate" it ran
+  afterwards silently mutated nothing until a before/after grep exposed it.
+- Carried forward: BDEF-10 (the payload column is a PII datastore with no retention),
+  BDEF-11 (the relay authenticates as schema owner — a scoped role is pending planner
+  ops), the shop-side exposure flag for the U6 window, and the BDEF-2 hygiene batch
+  grown by the review's duplication list. BDEF-2 item (2) closed en route — the env-name
+  union makes a `DATABSE_URL` typo a compile error instead of a permanently dark store.
