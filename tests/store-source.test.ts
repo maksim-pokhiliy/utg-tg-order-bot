@@ -32,15 +32,89 @@ describe("the pre-send statement", () => {
   });
 
   it("writes the dedupe back-reference in the same roundtrip", () => {
-    expect(storeSource).toMatch(
-      /values[\s\S]{0,120}select prior\.id from prior/u
+    expect(storeSource).toContain(
+      "insert into orders (attempt_id, content_hash, idempotency_key, schema_version, payload, dedupe_of)"
+    );
+    expect(storeSource).toContain(
+      "values ($3, $1, $2, $4, $5, (select prior.id from prior))"
     );
   });
 
-  it("never degrades into a key-only match", () => {
-    expect(storeSource).not.toMatch(
-      /where\s+idempotency_key = \$2\s+and\s+sent_at/u
+  it("conjoins all four narrowing conditions, and never disjoins them", () => {
+    expect(storeSource).toContain(
+      [
+        "  where content_hash = $1",
+        "    and idempotency_key = $2",
+        "    and sent_at is not null",
+        "    and received_at > now() - interval '30 minutes'",
+      ].join("\n")
     );
+    expect(storeSource).not.toContain(" or idempotency_key");
+    expect(storeSource).not.toContain(" or content_hash");
+    expect(storeSource).not.toContain(" or sent_at");
+  });
+});
+
+describe("the columns the statement returns and the reader looks up", () => {
+  const recordStatement = /const RECORD_STATEMENT = `([\s\S]*?)`;/.exec(
+    storeSource
+  )?.[1];
+
+  const returnedColumns = (): readonly string[] => {
+    if (recordStatement === undefined) {
+      throw new Error("the record statement is no longer a template literal");
+    }
+
+    const returning = /\nreturning\n([\s\S]*)$/.exec(recordStatement)?.[1];
+
+    if (returning === undefined) {
+      throw new Error("the record statement has no returning clause");
+    }
+
+    return returning
+      .split(",")
+      .map((part) => {
+        const aliased = /as (\w+)\s*$/.exec(part);
+
+        return (aliased?.[1] ?? part.trim()).trim();
+      })
+      .filter((name) => name !== "");
+  };
+
+  const readerKeys = (): readonly string[] => [
+    ...new Set(
+      [...storeSource.matchAll(/read(?:Text|Number)\(row, "(\w+)"\)/g)].map(
+        (match) => match[1] ?? ""
+      )
+    ),
+  ];
+
+  it("returns every column the response reader asks for", () => {
+    const produced = new Set(returnedColumns());
+
+    for (const key of readerKeys()) {
+      expect({ key, produced: produced.has(key) }).toEqual({
+        key,
+        produced: true,
+      });
+    }
+  });
+
+  it("returns exactly the columns the neon fixtures reproduce", () => {
+    const fixture: unknown = JSON.parse(
+      readRepoFile("./fixtures/neon/insert-duplicate.json")
+    );
+    const rows =
+      typeof fixture === "object" && fixture !== null && "rows" in fixture
+        ? fixture.rows
+        : undefined;
+    const row = Array.isArray(rows) ? rows[0] : undefined;
+
+    if (typeof row !== "object" || row === null) {
+      throw new Error("the duplicate fixture carries no row");
+    }
+
+    expect([...returnedColumns()].sort()).toEqual(Object.keys(row).sort());
   });
 });
 

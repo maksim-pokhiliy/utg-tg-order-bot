@@ -98,6 +98,14 @@ describe("the store request", () => {
     expect(call?.contentType).toBe("application/json");
   });
 
+  it("refuses to follow a redirect, so the connection string cannot be forwarded", async () => {
+    const stub = stubRelayFetch();
+
+    await recordAttempt(createAttempt(buildEnvelopeV2()));
+
+    expect(readNeonCalls(stub)[0]?.redirect).toBe("error");
+  });
+
   it("carries the v2 key, schema version and the verbatim envelope as params", async () => {
     const stub = stubRelayFetch();
     const attempt = createAttempt(buildEnvelopeV2());
@@ -120,6 +128,25 @@ describe("the store request", () => {
     await recordAttempt(attempt);
 
     expect(String(readNeonCalls(stub)[0]?.params[4])).toContain(PINNED_KEY);
+  });
+
+  it("binds exactly as many params as the statement has placeholders", async () => {
+    const stub = stubRelayFetch({ neon: async () => neonMarkOk() });
+    const attempt = createAttempt(buildEnvelopeV2());
+
+    await recordAttempt(attempt);
+    await markAttempt(attempt, { isDelivered: true, messageId: 1 });
+
+    for (const call of readNeonCalls(stub)) {
+      const highest = Math.max(
+        ...[...call.query.matchAll(/\$(\d+)/g)].map((match) => Number(match[1]))
+      );
+
+      expect({ highest, bound: call.params.length }).toEqual({
+        highest,
+        bound: highest,
+      });
+    }
   });
 
   it("sends a null key and schema version 1 for a v1 order", async () => {
@@ -171,10 +198,12 @@ describe("the store response", () => {
         },
       },
     });
-    expect(typeof (result.ok ? result.value.prior?.id : "")).toBe("string");
-    expect(typeof (result.ok ? result.value.prior?.ageSeconds : "")).toBe(
-      "number"
-    );
+    if (!result.ok) {
+      throw new Error(`expected a recorded attempt, got ${result.reason}`);
+    }
+
+    expect(typeof result.value.prior?.id).toBe("string");
+    expect(typeof result.value.prior?.ageSeconds).toBe("number");
   });
 
   it("reports response_unreadable when the envelope carries no rows array", async () => {
@@ -257,6 +286,39 @@ describe("the store failure classification", () => {
       recordAttempt(createAttempt(buildEnvelopeV2()))
     ).resolves.toEqual({ ok: false, reason: "network_error" });
     expect(joinAllLogged(logs)).toContain("network_error");
+  });
+
+  it("names a hostless connection string bad_config rather than blaming the network", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql:///neondb");
+    const stub = stubRelayFetch();
+
+    await expect(
+      recordAttempt(createAttempt(buildEnvelopeV2()))
+    ).resolves.toEqual({ ok: false, reason: "bad_config" });
+
+    expect(stub).not.toHaveBeenCalled();
+    expect(joinAllLogged(logs)).not.toContain("network_error");
+  });
+
+  it("logs a sqlstate only when it is shaped like one", async () => {
+    stubRelayFetch({
+      neon: async () =>
+        new Response(
+          JSON.stringify({
+            message: "nope",
+            code: "вул. Шевченка, 12 -- not a sqlstate",
+          }),
+          { status: 400 }
+        ),
+    });
+
+    await recordAttempt(createAttempt(buildEnvelopeV2()));
+
+    const logged = joinAllLogged(logs);
+
+    expect(logged).toContain("order_store_unavailable");
+    expect(logged).not.toContain("вул. Шевченка");
+    expect(logged).not.toContain("not a sqlstate");
   });
 
   it("reports bad_config for an unparseable connection string and never echoes it", async () => {

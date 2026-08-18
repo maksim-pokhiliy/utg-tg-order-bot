@@ -64,4 +64,8 @@ describe("the relay's time budget", () => {
       REQUEST_TIMEOUT_MS
     );
   });
+
+  it("stays at the ratified thirty seconds rather than drifting either way", () => {
+    expect(readMaxDuration()).toBe(30);
+  });
 });

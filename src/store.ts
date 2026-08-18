@@ -158,7 +158,9 @@ export const readDedupeVerdict = (
     prior.idempotencyKey !== null &&
     prior.idempotencyKey === attemptKey;
   const isInsideWindow =
-    prior.ageSeconds !== null && prior.ageSeconds < DEDUPE_WINDOW_SECONDS;
+    prior.ageSeconds !== null &&
+    prior.ageSeconds >= 0 &&
+    prior.ageSeconds < DEDUPE_WINDOW_SECONDS;
 
   if (!isSameContent || !isDelivered || !isKeyCorroborated || !isInsideWindow) {
     return { isSuppressed: false };

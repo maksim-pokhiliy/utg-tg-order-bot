@@ -29,9 +29,13 @@ const isTimeout = (error: unknown): boolean =>
   error instanceof Error &&
   (error.name === "TimeoutError" || error.name === "AbortError");
 
+const SQLSTATE_PATTERN = /^[0-9A-Z]{5}$/;
+
 const readEndpoint = (connectionString: string): string | undefined => {
   try {
-    return `https://${new URL(connectionString).hostname}${NEON_SQL_PATH}`;
+    const { hostname } = new URL(connectionString);
+
+    return hostname === "" ? undefined : `https://${hostname}${NEON_SQL_PATH}`;
   } catch {
     return undefined;
   }
@@ -49,7 +53,11 @@ const readErrorCode = async (
 
     const code = "code" in body ? body.code : undefined;
 
-    return typeof code === "string" ? code : undefined;
+    if (typeof code !== "string") {
+      return undefined;
+    }
+
+    return code === "" || SQLSTATE_PATTERN.test(code) ? code : undefined;
   } catch (error) {
     if (isTimeout(error)) {
       throw error;
@@ -112,6 +120,7 @@ export const runStatement = async (
   try {
     const response = await fetch(endpoint, {
       method: "POST",
+      redirect: "error",
       headers: {
         [CONNECTION_HEADER]: connectionString,
         "Content-Type": "application/json",
@@ -123,11 +132,13 @@ export const runStatement = async (
     const requestId = response.headers.get(REQUEST_ID_HEADER);
 
     if (!response.ok) {
+      const code = await readErrorCode(response);
+
       logFailure(event, {
         ...context,
         reason: "upstream_rejected",
         status: response.status,
-        code: await readErrorCode(response),
+        code,
         requestId,
         elapsedMs: Date.now() - startedAt,
       });

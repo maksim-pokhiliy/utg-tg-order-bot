@@ -60,13 +60,31 @@ describe("the content hash", () => {
     );
   });
 
-  it("changes when a cart line is removed", () => {
+  it("changes when the cart gains a line", () => {
     expect(
       hashOrder(
         buildEnvelopeV2({
           cart: [buildCartLine(), buildCartLine({ title: "Другий" })],
         })
       )
+    ).not.toBe(PINNED_HASH);
+  });
+
+  it("changes when a cart line is removed", () => {
+    const twoLines = hashOrder(
+      buildEnvelopeV2({
+        cart: [buildCartLine(), buildCartLine({ title: "Другий" })],
+      })
+    );
+    const oneLine = hashOrder(buildEnvelopeV2({ cart: [buildCartLine()] }));
+
+    expect(oneLine).not.toBe(twoLines);
+    expect(oneLine).toBe(PINNED_HASH);
+  });
+
+  it("changes when the quantity of a line changes", () => {
+    expect(
+      hashOrder(buildEnvelopeV2({ cart: [buildCartLine({ quantity: 3 })] }))
     ).not.toBe(PINNED_HASH);
   });
 
@@ -94,10 +112,5 @@ describe("the content hash", () => {
   it("gives a v1 and a v2 envelope different identities", () => {
     expect(hashOrder(buildEnvelopeV1())).not.toBe(hashOrder(PINNED_ENVELOPE));
     expect(hashOrder(buildEnvelopeV1())).toMatch(/^[0-9a-f]{64}$/);
-  });
-
-  it("never leaks a payload value into the digest text", () => {
-    expect(hashOrder(PINNED_ENVELOPE)).not.toContain("Марія");
-    expect(hashOrder(PINNED_ENVELOPE)).not.toContain("380671234567");
   });
 });

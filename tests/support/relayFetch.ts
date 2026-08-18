@@ -26,7 +26,6 @@ export const NEON_REQUEST_ID = "8f14e45f-ceea-467a-9f0b-6f1c2e3d4a5b";
 export const TELEGRAM_HOST = "api.telegram.org";
 
 export const PROBE_SENT_AT = "2026-08-17 22:20:13.854062+00";
-export const PROBE_KEY = "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731";
 
 const HTTP_OK = 200;
 const HTTP_BAD_REQUEST = 400;
@@ -182,6 +181,7 @@ export interface NeonCall {
   url: string;
   connectionString: string | null;
   contentType: string | null;
+  redirect: RequestInit["redirect"];
   query: string;
   params: readonly unknown[];
 }
@@ -213,6 +213,7 @@ export const readNeonCalls = (stub: RelayFetchStub): readonly NeonCall[] =>
       url: String(input),
       connectionString: headers.get("Neon-Connection-String"),
       contentType: headers.get("Content-Type"),
+      redirect: init?.redirect,
       query,
       params,
     };

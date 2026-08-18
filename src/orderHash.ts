@@ -22,7 +22,7 @@ export const canonicalize = (value: unknown): string => {
       .join(",")}}`;
   }
 
-  return JSON.stringify(value);
+  return JSON.stringify(value) ?? "null";
 };
 
 const withoutKey = (envelope: OrderEnvelope): OrderEnvelope =>

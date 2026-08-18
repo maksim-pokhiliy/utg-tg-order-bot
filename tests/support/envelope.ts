@@ -19,7 +19,7 @@ export const buildCartLine = (
   ...overrides,
 });
 
-export const buildCustomer = (
+const buildCustomer = (
   overrides: Partial<OrderCustomer> = {}
 ): OrderCustomer => ({
   first_name: "Марія",
@@ -30,7 +30,7 @@ export const buildCustomer = (
   ...overrides,
 });
 
-export const buildPayloadV2 = (
+const buildPayloadV2 = (
   overrides: Partial<OrderPayloadV2> = {}
 ): OrderPayloadV2 => ({
   customer: buildCustomer(),

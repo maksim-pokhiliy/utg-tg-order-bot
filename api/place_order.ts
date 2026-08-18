@@ -1,6 +1,6 @@
 import { isAuthorized } from "../src/auth.js";
 import { renderOrder } from "../src/messageV2.js";
-import { parseOrder } from "../src/payloadV2.js";
+import { parseOrder, type OrderEnvelope } from "../src/payloadV2.js";
 import {
   attemptLogFields,
   createAttempt,
@@ -55,6 +55,16 @@ const logStoreCrash = (event: string, error: unknown): void => {
   );
 };
 
+const createSafely = (envelope: OrderEnvelope): OrderAttempt | undefined => {
+  try {
+    return createAttempt(envelope);
+  } catch (error) {
+    logStoreCrash("order_store_unavailable", error);
+
+    return undefined;
+  }
+};
+
 const recordSafely = async (
   attempt: OrderAttempt
 ): Promise<PriorAttempt | undefined> => {
@@ -85,6 +95,19 @@ const describeOutcome = (sent: SendResult): AttemptOutcome =>
     ? { isDelivered: true, messageId: sent.messageId }
     : { isDelivered: false, failure: sent.reason };
 
+const deliver = async (
+  envelope: OrderEnvelope,
+  attempt: OrderAttempt | undefined
+): Promise<Response> => {
+  const sent = await sendOrderMessage(renderOrder(envelope));
+
+  if (attempt !== undefined) {
+    await markSafely(attempt, describeOutcome(sent));
+  }
+
+  return sent.ok ? Response.json(SUCCESS_BODY) : failure(HTTP_SERVER_ERROR);
+};
+
 const relay = async (request: Request): Promise<Response> => {
   if (!isAuthorized(request)) {
     console.warn(JSON.stringify({ event: "relay_auth_rejected" }));
@@ -107,9 +130,13 @@ const relay = async (request: Request): Promise<Response> => {
     return failure(HTTP_BAD_REQUEST);
   }
 
-  const attempt = createAttempt(parsed.value);
-  const prior = await recordSafely(attempt);
-  const verdict = readDedupeVerdict(attempt, prior);
+  const attempt = createSafely(parsed.value);
+
+  if (attempt === undefined) {
+    return deliver(parsed.value, undefined);
+  }
+
+  const verdict = readDedupeVerdict(attempt, await recordSafely(attempt));
 
   if (verdict.isSuppressed) {
     console.log(
@@ -123,11 +150,7 @@ const relay = async (request: Request): Promise<Response> => {
     return Response.json(SUCCESS_BODY);
   }
 
-  const sent = await sendOrderMessage(renderOrder(parsed.value));
-
-  await markSafely(attempt, describeOutcome(sent));
-
-  return sent.ok ? Response.json(SUCCESS_BODY) : failure(HTTP_SERVER_ERROR);
+  return deliver(parsed.value, attempt);
 };
 
 export async function POST(request: Request): Promise<Response> {

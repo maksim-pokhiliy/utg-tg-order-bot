@@ -131,33 +131,42 @@ Every condition errs toward sending, because the two mistakes are not equally ex
 
 ### Replay after an incident
 
-Two queries, because the rows they return want opposite defaults:
+Two queries, because the rows they return want opposite defaults. **The split is not "did we record a failure" — it is "do we know Telegram never saw it".** Three of the six failure reasons are ambiguous rather than confirmed: `ack_unreadable` means Telegram answered `200` with a body we could not parse (it almost certainly posted), and `timeout` and `network_error` both leave open whether the request was written before the connection died.
 
 ```sql
 select payload from orders
-where sent_at is null and dedupe_of is null and send_failure is not null;
+where sent_at is null
+  and not (dedupe_of is not null and send_failure is null)
+  and send_failure in ('config_missing', 'upstream_rejected', 'upstream_not_ok');
 ```
 
-These are confirmed failures — the send was attempted and did not succeed. Replaying them is safe.
+These are the confirmed non-deliveries: the bot was unconfigured, or Telegram actively refused the message. Replaying them is safe.
 
 ```sql
 select payload from orders
-where sent_at is null and dedupe_of is null and send_failure is null;
+where sent_at is null
+  and not (dedupe_of is not null and send_failure is null)
+  and (send_failure is null
+       or send_failure in ('ack_unreadable', 'timeout', 'network_error'));
 ```
 
-These are ambiguous — the attempt was recorded but its outcome never was, so the message may or may not have arrived. A human reconciles these against the chat before replaying anything.
+These are ambiguous — either the outcome was never recorded, or it was recorded as one of the three reasons that do not prove non-delivery. The message may or may not have arrived. A human reconciles these against the chat before replaying anything.
 
-Note what the conditions exclude. A suppressed attempt keeps `sent_at` null on purpose (it was never itself delivered, and letting it count as one would roll the window forward under a retry storm), so `dedupe_of is null` is what keeps replays from re-sending orders that _were_ delivered. Filtering on `sent_at is null` alone would do exactly that.
+Note what the conditions exclude, and why the exclusion is written the awkward way. A suppressed attempt keeps `sent_at` null on purpose (it was never itself delivered, and letting it count as one would roll the window forward under a retry storm), so something has to keep replays from re-sending orders that _were_ delivered — filtering on `sent_at is null` alone would do exactly that. But `dedupe_of is null` is the wrong instrument, because `dedupe_of` records what the SQL predicate matched while suppression is decided in TypeScript. A suppressed attempt is precisely one with a back-reference **and** no send recorded against it, which is what `not (dedupe_of is not null and send_failure is null)` says. Using `dedupe_of is null` alone would hide a genuinely lost order in the case where the two ever disagree.
 
 ### The shape of the record
 
 `migrations/001_orders.sql` holds the schema; it is applied out of band and is never executed by the code or by CI. Rows are append-only — the only columns any later write touches are `sent_at`, `telegram_message_id` and `send_failure`.
 
-`payload` is `text`, not `jsonb`, deliberately. Postgres `jsonb` rejects two things the decoders accept and the shop can send: a NUL character and an unpaired surrogate. Under `jsonb` those orders would relay fine and then be silently dropped by the store — precisely the hostile inputs worth having a record of. `text` always accepts them, and a later `payload::jsonb` cast fails loudly on the few odd rows instead of quietly at write time.
+`payload` is `text`, not `jsonb`, deliberately. Postgres `jsonb` rejects two things the decoders accept and the shop can send: a NUL character and an unpaired surrogate. Under `jsonb` those orders would relay fine and then be silently dropped by the store — precisely the hostile inputs worth having a record of. `text` always accepts them.
+
+One consequence to know before you reach for it: a `payload::jsonb` cast is **not** a safe ad-hoc tool here. Postgres aborts the whole statement on the first value it cannot convert, so a single row a buyer planted weeks ago takes down the entire result set, not just its own row. The replay queries above return `payload` as text and are unaffected. If you do need to look inside, filter to the rows you want first and expect the cast to fail on some of them.
 
 ### This is a store of personal data
 
-Once `DATABASE_URL` is set, buyer names, phone numbers and delivery addresses live in Postgres, where previously they existed only in the operators' chat. **There is no retention or erasure policy yet, and rows accumulate indefinitely** — that work is deliberately out of scope here and is tracked as a carry-forward. Logs remain clean: the store logs SQLSTATE codes, HTTP status, Neon's request id and timings, plus short prefixes of the hash and key for correlation — never a payload value, never the connection string, and never Neon's own `message` text, which can quote both SQL and parameter content.
+Once `DATABASE_URL` is set, buyer names, phone numbers and delivery addresses live in Postgres, where previously they existed only in the operators' chat. **There is no retention or erasure policy yet, and rows accumulate indefinitely** — that work is deliberately out of scope here and is tracked as a carry-forward. Logs remain clean: the store logs SQLSTATE codes (validated against the five-character SQLSTATE shape, so an upstream that puts prose in that field cannot smuggle it into a log line), HTTP status, Neon's request id, timings, row ids, JavaScript error class names, and short prefixes of the content hash and idempotency key for correlation — never a payload value, never the connection string or any fragment of it, never a full hash or key, and never Neon's own `message`/`detail`/`hint`, which can quote both SQL and parameter content.
+
+Two access facts worth stating plainly, since the migration does nothing about either: the relay authenticates with whatever role `DATABASE_URL` names, and that role currently owns the schema rather than holding the three grants the relay actually needs; and the rows carry no encryption, pseudonymisation or row-level policy.
 
 ## Environment
 

@@ -96,6 +96,7 @@ describe("the thirty-minute dedupe window", () => {
       readDedupeVerdict(attempt, corroboratingPrior(attempt, { ageSeconds }))
         .isSuppressed;
 
+    expect(verdictAt(-1)).toBe(false);
     expect(verdictAt(0)).toBe(true);
     expect(verdictAt(60)).toBe(true);
     expect(verdictAt(1799)).toBe(true);
