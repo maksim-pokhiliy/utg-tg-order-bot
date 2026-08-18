@@ -45,8 +45,9 @@ describe("the relay's time budget", () => {
     expect(STORE_QUERY_TIMEOUT_MS).toBe(2000);
   });
 
-  it("keeps the post-send mark box shorter still", () => {
+  it("gives the post-send mark its own, slightly longer box", () => {
     expect(STORE_MARK_TIMEOUT_MS).toBe(2500);
+    expect(STORE_MARK_TIMEOUT_MS).toBeGreaterThan(STORE_QUERY_TIMEOUT_MS);
   });
 
   it("gives the function more time than all three outgoing budgets can take together", () => {

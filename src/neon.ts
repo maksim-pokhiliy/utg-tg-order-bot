@@ -1,12 +1,14 @@
 import { readEnv } from "./env.js";
 
 const NEON_SQL_PATH = "/sql";
+const NEON_HOST_SUFFIX = ".neon.tech";
 const CONNECTION_HEADER = "Neon-Connection-String";
 const REQUEST_ID_HEADER = "neon-request-id";
 
 export type StoreFailure =
   | "not_configured"
   | "bad_config"
+  | "payload_too_large"
   | "upstream_rejected"
   | "response_unreadable"
   | "timeout"
@@ -35,7 +37,9 @@ const readEndpoint = (connectionString: string): string | undefined => {
   try {
     const { hostname } = new URL(connectionString);
 
-    return hostname === "" ? undefined : `https://${hostname}${NEON_SQL_PATH}`;
+    return hostname.endsWith(NEON_HOST_SUFFIX)
+      ? `https://${hostname}${NEON_SQL_PATH}`
+      : undefined;
   } catch {
     return undefined;
   }
@@ -115,7 +119,7 @@ export const runStatement = async (
     return { ok: false, reason: "bad_config" };
   }
 
-  const startedAt = Date.now();
+  const startedAt = performance.now();
 
   try {
     const response = await fetch(endpoint, {
@@ -140,7 +144,7 @@ export const runStatement = async (
         status: response.status,
         code,
         requestId,
-        elapsedMs: Date.now() - startedAt,
+        elapsedMs: Math.round(performance.now() - startedAt),
       });
 
       return { ok: false, reason: "upstream_rejected" };
@@ -154,7 +158,7 @@ export const runStatement = async (
         reason: "response_unreadable",
         status: response.status,
         requestId,
-        elapsedMs: Date.now() - startedAt,
+        elapsedMs: Math.round(performance.now() - startedAt),
       });
 
       return { ok: false, reason: "response_unreadable" };
@@ -167,7 +171,7 @@ export const runStatement = async (
         ...context,
         reason: "timeout",
         timeoutMs,
-        elapsedMs: Date.now() - startedAt,
+        elapsedMs: Math.round(performance.now() - startedAt),
       });
 
       return { ok: false, reason: "timeout" };
@@ -177,7 +181,7 @@ export const runStatement = async (
       ...context,
       reason: "network_error",
       errorName: error instanceof Error ? error.name : "unknown",
-      elapsedMs: Date.now() - startedAt,
+      elapsedMs: Math.round(performance.now() - startedAt),
     });
 
     return { ok: false, reason: "network_error" };

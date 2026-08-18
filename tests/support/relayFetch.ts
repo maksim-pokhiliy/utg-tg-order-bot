@@ -23,7 +23,8 @@ export const NEON_PASSWORD = "not-a-real-password";
 export const TEST_DATABASE_URL = `postgresql://relay_owner:${NEON_PASSWORD}@${NEON_HOST}/neondb?sslmode=require`;
 export const NEON_SQL_URL = `https://${NEON_HOST}/sql`;
 export const NEON_REQUEST_ID = "8f14e45f-ceea-467a-9f0b-6f1c2e3d4a5b";
-export const TELEGRAM_HOST = "api.telegram.org";
+const TELEGRAM_HOST = "api.telegram.org";
+const NEON_HOST_SUFFIX = ".neon.tech";
 
 export const PROBE_SENT_AT = "2026-08-17 22:20:13.854062+00";
 
@@ -155,7 +156,7 @@ export const stubRelayFetch = (
         : routes.telegram(telegramCalls);
     }
 
-    if (url.includes(NEON_HOST)) {
+    if (url.includes(NEON_HOST_SUFFIX)) {
       neonCalls += 1;
 
       return routes.neon === undefined ? neonFresh() : routes.neon(neonCalls);
@@ -182,12 +183,13 @@ export interface NeonCall {
   connectionString: string | null;
   contentType: string | null;
   redirect: RequestInit["redirect"];
+  hasSignal: boolean;
   query: string;
   params: readonly unknown[];
 }
 
 export const readNeonCalls = (stub: RelayFetchStub): readonly NeonCall[] =>
-  callsFor(stub, NEON_HOST).map(([input, init]) => {
+  callsFor(stub, NEON_HOST_SUFFIX).map(([input, init]) => {
     const rawBody = init?.body;
 
     if (typeof rawBody !== "string") {
@@ -214,6 +216,7 @@ export const readNeonCalls = (stub: RelayFetchStub): readonly NeonCall[] =>
       connectionString: headers.get("Neon-Connection-String"),
       contentType: headers.get("Content-Type"),
       redirect: init?.redirect,
+      hasSignal: init?.signal instanceof AbortSignal,
       query,
       params,
     };
@@ -259,7 +262,7 @@ export const readTelegramCall = (stub: RelayFetchStub): SentMessage => {
   return first;
 };
 
-export const captureConsoleLog = (): MockInstance =>
+const captureConsoleLog = (): MockInstance =>
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 
 export interface ConsoleCaptures {

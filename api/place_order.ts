@@ -8,8 +8,8 @@ import {
   readDedupeVerdict,
   recordAttempt,
   type AttemptOutcome,
+  type DedupeVerdict,
   type OrderAttempt,
-  type PriorAttempt,
 } from "../src/store.js";
 import { sendOrderMessage, type SendResult } from "../src/telegram.js";
 
@@ -45,12 +45,17 @@ const describeVersion = (body: unknown): number | string => {
   return typeof version === "number" ? version : typeof version;
 };
 
-const logStoreCrash = (event: string, error: unknown): void => {
+const logStoreCrash = (
+  event: string,
+  error: unknown,
+  attempt: OrderAttempt | undefined
+): void => {
   console.warn(
     JSON.stringify({
       event,
       reason: "internal_error",
       errorName: error instanceof Error ? error.name : "unknown",
+      ...(attempt === undefined ? {} : attemptLogFields(attempt)),
     })
   );
 };
@@ -59,23 +64,35 @@ const createSafely = (envelope: OrderEnvelope): OrderAttempt | undefined => {
   try {
     return createAttempt(envelope);
   } catch (error) {
-    logStoreCrash("order_store_unavailable", error);
+    logStoreCrash("order_store_unavailable", error, undefined);
 
     return undefined;
   }
 };
 
-const recordSafely = async (
-  attempt: OrderAttempt
-): Promise<PriorAttempt | undefined> => {
+const consultSafely = async (attempt: OrderAttempt): Promise<DedupeVerdict> => {
   try {
     const recorded = await recordAttempt(attempt);
+    const verdict = readDedupeVerdict(
+      attempt,
+      recorded.ok ? recorded.value.prior : undefined
+    );
 
-    return recorded.ok ? recorded.value.prior : undefined;
+    if (verdict.isSuppressed) {
+      console.log(
+        JSON.stringify({
+          event: "order_deduplicated",
+          dupeOf: verdict.dupeOf,
+          ...attemptLogFields(attempt),
+        })
+      );
+    }
+
+    return verdict;
   } catch (error) {
-    logStoreCrash("order_store_unavailable", error);
+    logStoreCrash("order_store_unavailable", error, attempt);
 
-    return undefined;
+    return { isSuppressed: false };
   }
 };
 
@@ -86,7 +103,7 @@ const markSafely = async (
   try {
     await markAttempt(attempt, outcome);
   } catch (error) {
-    logStoreCrash("order_store_mark_failed", error);
+    logStoreCrash("order_store_mark_failed", error, attempt);
   }
 };
 
@@ -136,17 +153,9 @@ const relay = async (request: Request): Promise<Response> => {
     return deliver(parsed.value, undefined);
   }
 
-  const verdict = readDedupeVerdict(attempt, await recordSafely(attempt));
+  const verdict = await consultSafely(attempt);
 
   if (verdict.isSuppressed) {
-    console.log(
-      JSON.stringify({
-        event: "order_deduplicated",
-        dupeOf: verdict.dupeOf,
-        ...attemptLogFields(attempt),
-      })
-    );
-
     return Response.json(SUCCESS_BODY);
   }
 

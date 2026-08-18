@@ -61,7 +61,7 @@ const readVerdict = async (response: Response): Promise<TelegramVerdict> => {
       isAccepted,
       isReadable: true,
       errorCode: typeof rawCode === "number" ? rawCode : undefined,
-      messageId: typeof rawId === "number" ? rawId : undefined,
+      messageId: Number.isSafeInteger(rawId) ? Number(rawId) : undefined,
     };
   } catch (error) {
     if (isTimeout(error)) {
@@ -95,6 +95,7 @@ export const sendOrderMessage = async (text: string): Promise<SendResult> => {
       `${TELEGRAM_API_ORIGIN}/bot${token}/sendMessage`,
       {
         method: "POST",
+        redirect: "error",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId,

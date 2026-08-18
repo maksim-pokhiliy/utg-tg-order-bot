@@ -5,11 +5,10 @@ import { hashOrder } from "./orderHash.js";
 import type { OrderEnvelope } from "./payloadV2.js";
 import type { SendFailure } from "./telegram.js";
 
-export type { StoreFailure };
-
 export const STORE_QUERY_TIMEOUT_MS = 2_000;
 export const STORE_MARK_TIMEOUT_MS = 2_500;
 export const DEDUPE_WINDOW_SECONDS = 1_800;
+export const MAX_PAYLOAD_CHARS = 262_144;
 
 const SCHEMA_VERSION_V1 = 1;
 const SCHEMA_VERSION_V2 = 2;
@@ -99,20 +98,38 @@ const readNumber = (
   return typeof value === "number" ? value : null;
 };
 
-const readPrior = (row: Record<string, unknown>): PriorAttempt | undefined => {
-  const id = readText(row, "dupe_of");
-
-  if (id === null) {
+const readPrior = (
+  row: Record<string, unknown>,
+  context: Record<string, unknown>
+): PriorAttempt | undefined => {
+  if (row["dupe_of"] === null || row["dupe_of"] === undefined) {
     return undefined;
   }
 
-  return {
-    id,
-    sentAt: readText(row, "prior_sent_at"),
-    idempotencyKey: readText(row, "prior_idempotency_key"),
-    contentHash: readText(row, "prior_content_hash"),
-    ageSeconds: readNumber(row, "prior_age_seconds"),
-  };
+  const id = readText(row, "dupe_of");
+  const sentAt = readText(row, "prior_sent_at");
+  const idempotencyKey = readText(row, "prior_idempotency_key");
+  const contentHash = readText(row, "prior_content_hash");
+  const ageSeconds = readNumber(row, "prior_age_seconds");
+
+  if (
+    id === null ||
+    sentAt === null ||
+    idempotencyKey === null ||
+    contentHash === null ||
+    ageSeconds === null
+  ) {
+    console.warn(
+      JSON.stringify({
+        event: "order_store_prior_unreadable",
+        ...context,
+      })
+    );
+
+    return undefined;
+  }
+
+  return { id, sentAt, idempotencyKey, contentHash, ageSeconds };
 };
 
 interface RowParams {
@@ -169,10 +186,38 @@ export const readDedupeVerdict = (
   return { isSuppressed: true, dupeOf: prior.id };
 };
 
+const isTooLarge = (
+  event: string,
+  params: RowParams,
+  context: Record<string, unknown>
+): boolean => {
+  if (params.payload.length <= MAX_PAYLOAD_CHARS) {
+    return false;
+  }
+
+  console.warn(
+    JSON.stringify({
+      event,
+      ...context,
+      reason: "payload_too_large",
+      payloadChars: params.payload.length,
+    })
+  );
+
+  return true;
+};
+
 export const recordAttempt = async (
   attempt: OrderAttempt
 ): Promise<RecordResult> => {
   const record = readRowParams(attempt);
+
+  if (
+    isTooLarge("order_store_unavailable", record, attemptLogFields(attempt))
+  ) {
+    return { ok: false, reason: "payload_too_large" };
+  }
+
   const outcome = await runStatement(
     "order_store_unavailable",
     attemptLogFields(attempt),
@@ -194,15 +239,11 @@ export const recordAttempt = async (
   }
 
   const [row] = outcome.rows;
+  const context = attemptLogFields(attempt);
+  const rowId = row === undefined ? null : readText(row, "id");
+  const prior = row === undefined ? undefined : readPrior(row, context);
 
-  if (row === undefined) {
-    return { ok: true, value: { rowId: null, prior: undefined } };
-  }
-
-  const rowId = readText(row, "id");
-  const prior = readPrior(row);
-
-  logStored({ rowId, dupeOf: prior?.id, ...attemptLogFields(attempt) });
+  logStored({ rowId, dupeOf: prior?.id, ...context });
 
   return { ok: true, value: { rowId, prior } };
 };
@@ -212,6 +253,11 @@ export const markAttempt = async (
   outcome: AttemptOutcome
 ): Promise<MarkResult> => {
   const mark = readRowParams(attempt);
+
+  if (isTooLarge("order_store_mark_failed", mark, attemptLogFields(attempt))) {
+    return { ok: false, reason: "payload_too_large" };
+  }
+
   const result = await runStatement(
     "order_store_mark_failed",
     attemptLogFields(attempt),

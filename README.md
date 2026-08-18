@@ -107,9 +107,11 @@ Stripping format characters costs some emoji their composition, and that is a re
 
 ## Persistence
 
-Set `DATABASE_URL` and the relay writes every decoded order to Postgres **before** it calls Telegram, over Neon's SQL-over-HTTP endpoint with the platform's own `fetch` — no driver, no dependency. Leave it unset and none of this happens.
+Set `DATABASE_URL` and the relay writes every decoded order to Postgres **before** it calls Telegram, over Neon's SQL-over-HTTP endpoint with the platform's own `fetch` — no driver, no dependency. Leave it unset and none of this happens: no database call, and none of the four store events in any log line.
 
-Three rules govern the store, and the code is built so that breaking any of them turns a named test red.
+The connection string's host must sit under `neon.tech`; anything else is refused as a misconfiguration before a request is made, so a mistyped or tampered value cannot send the credential somewhere new.
+
+Three rules govern the store. Each is pinned by a named test, and each pin was checked by mutation — breaking the rule in the source was confirmed to redden the test rather than merely assumed to.
 
 **The store never gates the send.** A database that is dead, slow, missing its table or misconfigured costs an audit row — never an order, and never a different answer to the shop. Every failure is one structured log line and the flow continues as though the store did not exist. That includes the case where the migration has not been applied yet: the missing table comes back as SQLSTATE `42P01`, the relay fails open, and the log names the cause. Either deploy order is therefore safe.
 
@@ -152,11 +154,13 @@ where sent_at is null
 
 These are ambiguous — either the outcome was never recorded, or it was recorded as one of the three reasons that do not prove non-delivery. The message may or may not have arrived. A human reconciles these against the chat before replaying anything.
 
-Note what the conditions exclude, and why the exclusion is written the awkward way. A suppressed attempt keeps `sent_at` null on purpose (it was never itself delivered, and letting it count as one would roll the window forward under a retry storm), so something has to keep replays from re-sending orders that _were_ delivered — filtering on `sent_at is null` alone would do exactly that. But `dedupe_of is null` is the wrong instrument, because `dedupe_of` records what the SQL predicate matched while suppression is decided in TypeScript. A suppressed attempt is precisely one with a back-reference **and** no send recorded against it, which is what `not (dedupe_of is not null and send_failure is null)` says. Using `dedupe_of is null` alone would hide a genuinely lost order in the case where the two ever disagree.
+Note what the conditions exclude, and why the exclusion is written the awkward way. A suppressed attempt keeps `sent_at` null on purpose (it was never itself delivered, and letting it count as one would roll the window forward under a retry storm), so something has to keep replays from re-sending orders that _were_ delivered — filtering on `sent_at is null` alone would do exactly that. But `dedupe_of is null` is the wrong instrument, because `dedupe_of` records what the SQL predicate matched while suppression is decided in TypeScript. A suppressed attempt is precisely one with a back-reference **and** no send recorded against it, which is what `not (dedupe_of is not null and send_failure is null)` says. On today's code the two cannot disagree — the TypeScript check is a strict re-verification of the SQL one, so every row `dedupe_of is null` would exclude is a duplicate that was genuinely delivered. The longer condition costs nothing and stops being merely equivalent the moment the column parsing drifts, which is exactly when a replay would matter.
 
 ### The shape of the record
 
 `migrations/001_orders.sql` holds the schema; it is applied out of band and is never executed by the code or by CI. Rows are append-only — the only columns any later write touches are `sent_at`, `telegram_message_id` and `send_failure`.
+
+Two limits worth knowing. A serialized order over 262 144 characters is **not** stored: the relay logs `payload_too_large` and carries on, because a store that can refuse an order is worse than a store with a gap in it. And a row written late — the recovery path where the pre-send insert never landed and the post-send mark inserts the whole row instead — stamps `received_at` at mark time rather than receipt time, so its dedupe window can run up to about fifteen seconds long. Both are deliberate.
 
 `payload` is `text`, not `jsonb`, deliberately. Postgres `jsonb` rejects two things the decoders accept and the shop can send: a NUL character and an unpaired surrogate. Under `jsonb` those orders would relay fine and then be silently dropped by the store — precisely the hostile inputs worth having a record of. `text` always accepts them.
 

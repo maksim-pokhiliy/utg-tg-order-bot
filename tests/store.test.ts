@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createAttempt,
   markAttempt,
+  MAX_PAYLOAD_CHARS,
   recordAttempt,
   STORE_MARK_TIMEOUT_MS,
   STORE_QUERY_TIMEOUT_MS,
@@ -96,6 +97,25 @@ describe("the store request", () => {
     expect(call?.url).toBe(NEON_SQL_URL);
     expect(call?.connectionString).toBe(TEST_DATABASE_URL);
     expect(call?.contentType).toBe("application/json");
+  });
+
+  it("boxes both statements in an abort signal", async () => {
+    const stub = stubRelayFetch({ neon: async () => neonMarkOk() });
+    const attempt = createAttempt(buildEnvelopeV2());
+
+    await recordAttempt(attempt);
+    await markAttempt(attempt, { isDelivered: true, messageId: 1 });
+
+    const calls = readNeonCalls(stub);
+
+    expect(calls).toHaveLength(2);
+
+    for (const call of calls) {
+      expect({
+        query: call.query.slice(0, 12),
+        hasSignal: call.hasSignal,
+      }).toEqual({ query: call.query.slice(0, 12), hasSignal: true });
+    }
   });
 
   it("refuses to follow a redirect, so the connection string cannot be forwarded", async () => {
@@ -206,6 +226,47 @@ describe("the store response", () => {
     expect(typeof result.value.prior?.ageSeconds).toBe("number");
   });
 
+  it("reports a stored row even when the statement returns no rows at all", async () => {
+    stubRelayFetch({ neon: async () => neonMarkOk() });
+
+    await expect(
+      recordAttempt(createAttempt(buildEnvelopeV2()))
+    ).resolves.toEqual({ ok: true, value: { rowId: null, prior: undefined } });
+
+    expect(joinAllLogged(logs)).toContain("order_stored");
+  });
+
+  it("names an unreadable prior instead of quietly reporting none", async () => {
+    stubRelayFetch({
+      neon: async () => neonDuplicate({ dupeOf: "6", contentHash: null }),
+    });
+
+    const result = await recordAttempt(createAttempt(buildEnvelopeV2()));
+
+    expect(result).toEqual({
+      ok: true,
+      value: { rowId: "7", prior: undefined },
+    });
+    expect(joinAllLogged(logs)).toContain("order_store_prior_unreadable");
+  });
+
+  it("refuses to store a payload past the size cap, and says so", async () => {
+    const stub = stubRelayFetch();
+    const huge = "я".repeat(MAX_PAYLOAD_CHARS);
+
+    await expect(
+      recordAttempt(createAttempt(buildEnvelopeV2({ comment: huge })))
+    ).resolves.toEqual({ ok: false, reason: "payload_too_large" });
+
+    expect(stub).not.toHaveBeenCalled();
+
+    const logged = joinAllLogged(logs);
+
+    expect(logged).toContain("payload_too_large");
+    expect(logged).toContain("order_store_unavailable");
+    expect(logged).not.toContain("яяяя");
+  });
+
   it("reports response_unreadable when the envelope carries no rows array", async () => {
     stubRelayFetch({
       neon: async () => new Response(JSON.stringify({ rows: "nope" })),
@@ -286,6 +347,44 @@ describe("the store failure classification", () => {
       recordAttempt(createAttempt(buildEnvelopeV2()))
     ).resolves.toEqual({ ok: false, reason: "network_error" });
     expect(joinAllLogged(logs)).toContain("network_error");
+  });
+
+  it("never dials a host outside neon.tech, whatever the connection string says", async () => {
+    for (const hostile of [
+      "postgresql://u:p@evil.example/neondb",
+      "postgresql://u:p@10.0.0.1/neondb",
+      "postgresql://u:p@127.0.0.1:5432/neondb",
+      "postgresql://u:p@neon.tech.attacker.example/neondb",
+      "postgresql://u:p@neon.tech/neondb",
+    ]) {
+      vi.stubEnv("DATABASE_URL", hostile);
+      const stub = stubRelayFetch();
+
+      await expect(
+        recordAttempt(createAttempt(buildEnvelopeV2()))
+      ).resolves.toEqual({ ok: false, reason: "bad_config" });
+
+      expect({ hostile, calls: stub.mock.calls.length }).toEqual({
+        hostile,
+        calls: 0,
+      });
+
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("accepts a real neon endpoint host", async () => {
+    vi.stubEnv(
+      "DATABASE_URL",
+      "postgresql://u:p@ep-cool-darkness-123456-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    );
+    const stub = stubRelayFetch();
+
+    await recordAttempt(createAttempt(buildEnvelopeV2()));
+
+    expect(readNeonCalls(stub)[0]?.url).toBe(
+      "https://ep-cool-darkness-123456-pooler.us-east-2.aws.neon.tech/sql"
+    );
   });
 
   it("names a hostless connection string bad_config rather than blaming the network", async () => {
@@ -399,7 +498,7 @@ describe("the post-send mark", () => {
     expect(joinAllLogged(logs)).toContain("order_store_mark_failed");
   });
 
-  it("boxes the mark in its own shorter budget", async () => {
+  it("boxes the mark in its own budget, not the pre-send one", async () => {
     stubRelayFetch({
       neon: async () => {
         throw new DOMException("The operation timed out.", "TimeoutError");

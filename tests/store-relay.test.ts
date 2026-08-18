@@ -125,6 +125,36 @@ describe("the relay with a store", () => {
     expect(joinAllLogged(logs)).toContain("order_stored");
   });
 
+  it("refuses a telegram message id that postgres could never store", async () => {
+    const stub = stubRelayFetch({
+      neon: async (call) => (call === 1 ? neonFresh() : neonMarkOk()),
+      telegram: async () =>
+        new Response(
+          JSON.stringify({ ok: true, result: { message_id: 1.5 } }),
+          { status: 200 }
+        ),
+    });
+
+    const response = await POST(new StubRequest(buildOrderV2()));
+
+    expect(response.status).toBe(200);
+    expect(readNeonCalls(stub)[1]?.params[6]).toBeNull();
+  });
+
+  it("refuses to follow a redirect on the telegram call either", async () => {
+    const stub = stubRelayFetch({
+      neon: async (call) => (call === 1 ? neonFresh() : neonMarkOk()),
+    });
+
+    await POST(new StubRequest(buildOrderV2()));
+
+    const telegramCall = stub.mock.calls.find(([input]) =>
+      String(input).includes("api.telegram.org")
+    );
+
+    expect(telegramCall?.[1]?.redirect).toBe("error");
+  });
+
   it("marks the named failure when telegram refuses the message", async () => {
     const stub = stubRelayFetch({
       neon: async (call) => (call === 1 ? neonFresh() : neonMarkOk()),
