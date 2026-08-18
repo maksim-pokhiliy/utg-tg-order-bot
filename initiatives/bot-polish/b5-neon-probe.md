@@ -36,10 +36,15 @@ the external half of every inequality gets measured before a step is designed).
 Three cold samples — 863, 921 and 925 ms — after idles of nine minutes, nine days
 and one hour (the third caught live during the plan-gate Q3 validation) — the
 resume cost is repeatable, sub-second, and independent of how long the compute
-slept. Autosuspend is real and fires within ≤9 minutes of quiet (consistent with
-the free-plan 5-minute default), so **the cold path is the COMMON path for this
+slept. Autosuspend is real and fires within ≤9 minutes of quiet. The plan is Neon
+**paid** (owner-confirmed 2026-08-18 — this resolves the in-repo contradiction the
+B5 review flagged; the paid default autosuspend is likewise 5 minutes, so the
+measurement stands unchanged). So **the cold path is the COMMON path for this
 shop's traffic** — roughly one second of added latency on the first query of an
-order, invisible next to the Telegram roundtrip and capped by the timeout box.
+order, invisible next to the Telegram roundtrip and capped by the timeout box. A
+paid plan CAN disable scale-to-zero entirely; not taken — the measured cost does
+not justify paying for warm compute, revisit only if first-order latency ever
+starts to matter.
 
 ## Response shapes (fixture source of truth)
 

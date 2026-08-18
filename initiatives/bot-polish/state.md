@@ -33,9 +33,13 @@ the BDEF-9 scenario proven live on production rows — journal 2026-08-18).
   serving deployment (the BDEF-1 lesson applies).
 - **BDEF-8** (the enforced Telegram width metric, ~980 units of cart room) — a direct
   Bot API probe, planner-owned, any time.
-- Owner calls parked: whether to rotate the `DATABASE_URL` password (it crossed the
-  owner's terminal and the planner's scratchpad during B5, same class as the B1 bot-token
-  note); whether bot-polish now runs `/initiative-close` or stays open to host U6.
+- Owner rulings 2026-08-18: the initiative **stays OPEN to host U6**; the
+  `DATABASE_URL` password rotation is **owner-owned, unscheduled** («как-нибудь
+  сделаю») — note that BDEF-11's scoped-role swap will retire the exposed credential
+  from the relay anyway, while the owner-role password itself remains the owner's to
+  rotate; the Neon plan is **paid** (probe report corrected — the free-plan
+  attribution was the wrong half of an accurate measurement). The throwaway
+  `neon-probe-fn` project is deleted by the owner.
 
 ## Open decisions awaiting ratification
 
