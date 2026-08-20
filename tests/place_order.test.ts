@@ -54,11 +54,17 @@ describe("POST /api/place_order", () => {
 
   it("answers 400 when the body is not valid json", async () => {
     const fetchStub = stubTelegram();
+    const logs = captureConsoleWarn();
 
     const response = await POST(new BrokenBodyRequest());
 
     expect(response.status).toBe(400);
     expect(fetchStub).not.toHaveBeenCalled();
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain('"version":"no_body"');
+    expect(logged).not.toContain('"version":"absent"');
   });
 
   it("answers an opaque 500 when telegram rejects the message", async () => {

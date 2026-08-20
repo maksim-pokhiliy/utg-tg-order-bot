@@ -18,7 +18,11 @@ import {
   CHAT_ID,
   RELAY_URL,
 } from "./support/orderPayload.js";
-import { stubTelegram } from "./support/telegram.js";
+import {
+  captureConsoleWarn,
+  joinLoggedLines,
+  stubTelegram,
+} from "./support/telegram.js";
 
 const IGNORED_KEYS = new Set(["then", "length", "constructor"]);
 
@@ -189,6 +193,8 @@ describe("version 2 is the only shape the relay accepts", () => {
   });
 
   it("refuses a v1-shaped body, as an unrecognised payload and nothing more", async () => {
+    const logs = captureConsoleWarn();
+
     await expectRejected({
       first_name: "Олександр",
       last_name: "Петренко",
@@ -203,6 +209,11 @@ describe("version 2 is the only shape the relay accepts", () => {
       currency: "UAH",
       cart: [buildCartItem()],
     });
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("version_unsupported");
+    expect(logged).not.toContain("customer_not_object");
   });
 });
 

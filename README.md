@@ -193,7 +193,7 @@ npm run format        # prettier --write .
 npm run format:check  # what CI runs
 ```
 
-The deployed function and the test tree compile as two separate TypeScript programs — `tsconfig.json` covers `api/` and `src/`, `tsconfig.test.json` covers `tests/`, `scripts/` and the vitest config — so nothing test-only can reach the type world of the code that ships.
+The deployed function and the test tree compile as two separate TypeScript programs — `tsconfig.json` covers `api/` and `src/`, `tsconfig.test.json` covers `tests/` and the vitest config — so nothing test-only can reach the type world of the code that ships.
 
 Node is pinned to `24.x` through `engines.node`: Vercel reads it for the runtime and CI reads it via `node-version-file`, so there is one pin rather than three (npm only warns about it unless `engine-strict` is set). Tests never reach the network — the Telegram API is stubbed wherever it is called, and nothing in this repository may POST to the deployed relay.
 

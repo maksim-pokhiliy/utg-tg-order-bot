@@ -166,6 +166,24 @@ describe("parseOrder version gate", () => {
       expect(result.reason).not.toBe("customer_not_object");
     }
   });
+
+  it("never reads a single payload field when the version is wrong", () => {
+    let customerReads = 0;
+    const order = buildOrder({ version: 99 });
+
+    Object.defineProperty(order, "customer", {
+      configurable: true,
+      enumerable: true,
+      get: (): Record<string, unknown> => {
+        customerReads += 1;
+
+        return buildCustomer();
+      },
+    });
+
+    expectRejectedBody(order, "version_unsupported");
+    expect(customerReads).toBe(0);
+  });
 });
 
 describe("parseOrder happy paths", () => {

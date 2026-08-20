@@ -209,3 +209,37 @@ describe("the clamps that no accepted payload can reach", () => {
     expect(process.memoryUsage().heapUsed - before).toBeLessThan(60_000_000);
   });
 });
+
+describe("no order the decoder accepts can exceed the telegram limit", () => {
+  const CART_SIZES = [1, 5, 9, 13, 17, 21, 25, 31, 40];
+  const TITLE_LENGTHS = [1, 40, 96, 144, 200];
+  const COMMENT_LENGTHS = [0, 51, 101, 200, 600];
+
+  it("holds across the cart, title and comment ranges the composer must budget", () => {
+    let widest = 0;
+
+    for (const size of CART_SIZES) {
+      for (const titleLength of TITLE_LENGTHS) {
+        for (const commentLength of COMMENT_LENGTHS) {
+          const message = render(
+            buildOrder({
+              comment: "к".repeat(commentLength),
+              cart: Array.from({ length: size }, (_, index) =>
+                buildCartItem({
+                  title: `${String(index)}${"т".repeat(titleLength)}`,
+                  productUrl: REPRO_URL,
+                })
+              ),
+            })
+          );
+
+          widest = Math.max(widest, message.length);
+
+          expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+        }
+      }
+    }
+
+    expect(widest).toBeGreaterThan(TELEGRAM_LIMIT - 100);
+  });
+});
