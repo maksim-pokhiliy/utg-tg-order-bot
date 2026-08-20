@@ -436,3 +436,52 @@ Append-only. One entry per session/step.
   ops), the shop-side exposure flag for the U6 window, and the BDEF-2 hygiene batch
   grown by the review's duplication list. BDEF-2 item (2) closed en route — the env-name
   union makes a `DATABSE_URL` typo a compile error instead of a permanently dark store.
+
+## 2026-08-20 — U6: the relay forgets v1, and the board closes
+
+- **Merged as a PAIR** — this repo's PR #5 `a81fa1e` (41 files, +2981/−4794) with the shop's #24
+  `700fca0`. The rename retires five identifiers the shop's contract test names, so neither half
+  could land alone. Battery 399 tests / 19 files.
+- **What went.** The v1 decoder, renderer and golden corpus, plus every v1 branch in the shared
+  test support. A versionless or `version: 1` body is now an ordinary 400 through the normal path,
+  with no special-casing. BDEF-6, BDEF-7 and the BDEF-2 batch closed as the side effect they were
+  always scheduled to be.
+- **The planner's deletion set was wrong, and the plan gate is what caught it.** The step prompt
+  ordered `rm` on `src/payload.ts` and `src/message.ts` — written from file NAMES without reading
+  the modules. B3 had turned them into the shared library BOTH versions read: 10 of 14 and 17 of
+  18 exports load-bearing for v2. A literal execution would have deleted the working relay. The
+  replacement is a five-module split (`decode.ts` + `payload.ts`, `render.ts` + `message.ts`,
+  `delivery.ts`), and the third module is structurally required rather than stylistic — folding
+  the primitives into the decoder is circular.
+- **Three guards had their only end-to-end pin riding on a v1 carrier, and a fourth was never
+  pinned at all.** Cart-line HTML escaping (strip it and the suite stayed 384/384 green while
+  master caught it with four failures); the 600-char comment clamp; `payloadField`'s
+  normalise-then-escape ordering, whose inversion renders a fullwidth `＜a href=…＞` as a **live
+  anchor** in the operators' chat. The fourth is "auth precedes the body" — the invariant the
+  planner's authorisation to delete v1 rested on — which stayed green with `isAuthorized` moved
+  below the decode. All four are pinned now. **When a deletion removes a version, it also removes
+  whichever guards were observable only through it, and those are invisible by construction.**
+- **The audit table could not testify.** `orders.schema_version` exists since B5, so "has any v1
+  traffic arrived?" looks answerable — and is not: the table holds zero rows by design after B5
+  deleted its smoke rows, confirmed forensically by identity high-water 9 against lifetime 6
+  inserts and 6 deletes. The authorisation is structural instead: auth precedes the body, the
+  secret is enforced in production, and the one secret-holder has sent v2 only since U5a. Shop-side
+  D-21.
+- **Proven by real requests before the merge, not only by tests.** Preview deployments could not
+  serve this — they 302 to Vercel SSO behind Deployment Protection — so the compiled deploy
+  entrypoint was hosted locally (the repo's own `tsconfig.smoke.json` output) with real Telegram
+  credentials and the real database, and curled: 401 without a secret, 401 with a wrong one, **400
+  on `version: 1` and on a genuine versionless legacy body** (log: `version_unsupported`,
+  `version: "absent"`), 200 on v2 with `order_stored`, a Neon row at `schema_version = 2` and a
+  delivered message. The rows were deleted afterwards, leaving the table at zero for real orders.
+- **Review, deep, pre-cap as the rule requires:** 218 pooled → 31 distinct → 31 reported, no cap
+  bound, 31 CONFIRMED / 0 UNPROVEN. It confirmed the v2 path is provably identical to master —
+  rename-normalised diff plus a differential over 1284 bodies across ten observables, and
+  `PINNED_HASH` unmoved, so order identity did not drift. Its own executor had already reported
+  that "no v2 assertion was lost" was FALSE and fixed it — the honest half of the same finding.
+- **Six items go to the shop's UAC-26** as this repo's review tail, none a defect today. The
+  currency case-sensitivity hole is the one worth doing first: it was ported from master
+  knowingly, and "identical breadth" there meant identically blind.
+- **This board is complete.** What remains is planner ops — BDEF-11 (scoped Neon role), BDEF-10
+  (retention), BDEF-8 (the Telegram width metric) — plus the shop's U7 gate, which nothing here
+  blocks.

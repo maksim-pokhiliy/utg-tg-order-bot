@@ -1,7 +1,7 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-18 (B5 CLOSED — merged `1d31e20`, prod-smoked through the live shop
-chain, dedupe proven on real rows; the bot board B1–B5 is complete)
+**Updated:** 2026-08-20 (U6 merged — the relay knows only v2. This board is COMPLETE and the
+initiative can close; what is left here is planner ops, not steps)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -18,28 +18,48 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 ## Next action
 
-**The bot board is COMPLETE** — B1–B5 all shipped, prod-verified and smoked. B5 closed
-2026-08-18: every decoded order is written to Neon before the Telegram send, confirmed
-retry-duplicates are suppressed by content identity, and a dead database provably costs
-an audit row, never an order (458 tests, 34 mutation gates, deep review 67 pre-cap → 19,
-the BDEF-9 scenario proven live on production rows — journal 2026-08-18).
+**This board is COMPLETE.** B1–B5 shipped and prod-verified, and **U6 merged 2026-08-20**
+(PR #5 `a81fa1e`) — the paired step the initiative was deliberately held open to host.
 
-**What remains is not a bot step:**
+The relay now accepts exactly ONE payload shape. The v1 decoder, renderer and golden corpus are
+deleted, so a versionless or `version: 1` body is an ordinary 400 through the normal validation
+path. BDEF-6, BDEF-7 and the BDEF-2 batch closed with it, as predicted — they were waiting for
+precisely this step. `schema_version` stays in the schema and always reads `2`: deliberate, it is
+the only way a future version change becomes observable in production data.
 
-- **U6** (the paired contract close: bot drops v1, both repos pin v2 in one step) —
-  shop+bot window, carries BDEF-6/7 and the BDEF-2 hygiene batch. Owner decides when.
-- **BDEF-11** — swap the relay's Neon role for a scoped one (INSERT/SELECT/UPDATE on
-  `orders` only); planner ops, near-term, needs a Vercel env update + redeploy of the
-  serving deployment (the BDEF-1 lesson applies).
-- **BDEF-8** (the enforced Telegram width metric, ~980 units of cart room) — a direct
-  Bot API probe, planner-owned, any time.
-- Owner rulings 2026-08-18: the initiative **stays OPEN to host U6**; the
-  `DATABASE_URL` password rotation is **owner-owned, unscheduled** («как-нибудь
-  сделаю») — note that BDEF-11's scoped-role swap will retire the exposed credential
-  from the relay anyway, while the owner-role password itself remains the owner's to
-  rotate; the Neon plan is **paid** (probe report corrected — the free-plan
-  attribution was the wrong half of an accurate measurement). The throwaway
-  `neon-probe-fn` project is deleted by the owner.
+**Verified by real requests before it merged**, not only by the 399-test battery: the compiled
+deploy entrypoint was hosted locally with real credentials and the real database, and curled —
+401 without a secret, 401 with a wrong one, **400 on `version: 1` and on a genuine versionless
+legacy body**, 200 on v2 with `order_stored`, a Neon row at `schema_version = 2` and a delivered
+Telegram message. Preview deployments could not serve this: they are behind Deployment
+Protection, which 302s to SSO before the route is reached.
+
+**One thing the deletion taught, worth carrying to any future removal:** three guards had their
+only end-to-end pin riding on something v1 carried (cart-line HTML escaping, the 600-char comment
+clamp, `payloadField`'s normalise-then-escape ordering), and a fourth — "auth precedes the body" —
+was never pinned at all, despite being the invariant that authorised the deletion. All four are
+pinned now. When a deletion removes a version it also removes whichever guards were observable
+only through it, and those are invisible by construction.
+
+### What remains here is planner ops, not steps
+
+- **BDEF-11** — swap the relay's Neon role for a scoped one (INSERT/SELECT/UPDATE on `orders`
+  only; today it authenticates as the schema owner and could `drop table orders`). Needs a Vercel
+  env update plus a redeploy of the **serving** deployment resolved by id from its logs, never the
+  first URL in `vercel ls --prod` (the BDEF-1 lesson, which once cost three minutes of 500s). It
+  also retires the exposed credential from the relay, which partly answers the owner's unscheduled
+  password rotation.
+- **BDEF-10** — B5 created a PII datastore with no retention policy.
+- **BDEF-8** — which Telegram width metric is actually enforced; a direct Bot API probe, worth
+  ~980 units of cart room.
+- **BDEF-12** — CLOSED: promoted to the shop's ledger as UAC-25 and narrowed there to its policy
+  half by U6.
+- **UAC-26** in the shop ledger carries this repo's U6 review tail (six items, none a defect
+  today). The currency case-sensitivity hole is the one worth doing first — it was ported from
+  master knowingly.
+
+The shop's initiative has one step left, **U7**, which is the owner's browser gate plus
+`/initiative-close`. Nothing in this repo blocks it.
 
 ## Open decisions awaiting ratification
 

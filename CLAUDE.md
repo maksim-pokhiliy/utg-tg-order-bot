@@ -22,14 +22,21 @@ one message and sends it to the operators' chat via the Telegram Bot API
 Deployed as Vercel project `telegram-bot-server`, auto-deploys `master`. **LIVE — real
 volunteer orders flow through this relay**; every merge must leave it fully functional.
 
-Current state (post `bot-polish` B5, merged 2026-08-18): a typed zero-dependency
+Current state (post `ua-checkout` U6, merged 2026-08-20): a typed zero-dependency
 Vercel function (`api/place_order.ts` + `src/*`) with a vitest suite, a CI battery
-and an ESM load smoke. The relay dual-accepts the v1 and v2 payloads, authenticates
-callers, sanitizes and width-bounds the message, and persists every decoded order to
-Neon Postgres BEFORE the Telegram send (append-only `orders` table, content-hash
-dedupe of confirmed-delivered retries, fail-open by law: a dead database costs an
-audit row, never an order). The whole bot board B1–B5 is shipped; see
-`initiatives/bot-polish/`.
+and an ESM load smoke, compiled by two TS programs (`tsconfig.json` for the deployed
+`api`+`src`, `tsconfig.test.json` for the tests — `npm run typecheck` runs both).
+**The relay accepts exactly ONE payload shape, v2**; the v1 decoder, renderer and
+golden corpus were deleted in U6, so a versionless or `version: 1` body is now an
+ordinary `400` through the normal validation path, with no special-casing. It
+authenticates callers BEFORE reading the body (an invariant a test now pins — an
+unauthenticated caller gets neither a parse nor a payload-shape oracle), sanitizes
+and width-bounds the message, and persists every decoded order to Neon Postgres
+BEFORE the Telegram send (append-only `orders` table, content-hash dedupe of
+confirmed-delivered retries, fail-open by law: a dead database costs an audit row,
+never an order). `schema_version` stays in the schema and now always reads `2` — that
+is deliberate, it is the only way a future version change becomes observable in
+production data. The whole bot board B1–B5 is shipped; see `initiatives/bot-polish/`.
 
 Env (set in Vercel, no local `.env`): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`;
 `ORDER_RELAY_SECRET` (optional) gates callers when set; `DATABASE_URL` (optional,
