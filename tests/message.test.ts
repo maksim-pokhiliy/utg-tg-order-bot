@@ -521,6 +521,41 @@ describe("the address source line", () => {
 });
 
 describe("escaping and forgery resistance", () => {
+  it("escapes markup a cart title carries", () => {
+    const message = render(
+      buildOrder({ cart: [buildCartItem({ title: "<b>Patch</b> & co" })] })
+    );
+
+    expect(message).toContain(
+      "🏷️ <b>Title:</b> &lt;b&gt;Patch&lt;/b&gt; &amp; co"
+    );
+    expect(message).not.toContain("<b>Patch</b>");
+  });
+
+  it("escapes the ampersands a product url query string carries", () => {
+    const message = render(
+      buildOrder({
+        cart: [
+          buildCartItem({ productUrl: "https://shop.test/p?a=1&b=2&utm=<x>" }),
+        ],
+      })
+    );
+
+    expect(message).toContain(
+      "🔗 <b>Product URL:</b> https://shop.test/p?a=1&amp;b=2&amp;utm=&lt;x&gt;"
+    );
+    expect(message).not.toMatch(/&(?!amp;|lt;|gt;)/);
+  });
+
+  it("escapes markup a comment carries", () => {
+    const message = render(buildOrder({ comment: "<b>rush</b> & call" }));
+
+    expect(message).toContain(
+      "📄 <b>Additional Information:</b> &lt;b&gt;rush&lt;/b&gt; &amp; call"
+    );
+    expect(message).not.toContain("<b>rush</b>");
+  });
+
   it("escapes markup a warehouse name carries", () => {
     const message = render(
       buildOrder({
@@ -732,6 +767,12 @@ describe("the clamp limits", () => {
   it("clamps the settlement at 200", () => {
     expectClampedAt("🌍 <b>City:</b>", 200, (value) =>
       buildOrder({ delivery: buildDeliveryBranch({ city: value }) })
+    );
+  });
+
+  it("clamps the comment at 600", () => {
+    expectClampedAt("📄 <b>Additional Information:</b>", 600, (value) =>
+      buildOrder({ comment: value })
     );
   });
 });

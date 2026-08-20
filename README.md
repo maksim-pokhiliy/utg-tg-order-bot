@@ -10,7 +10,7 @@ A top-level `version` of exactly `2` is **required**. Anything else — absent, 
 
 ### The order envelope
 
-Ukrainian delivery does not fit a flat address string, so v2 nests the recipient under `customer` and makes delivery a discriminated choice.
+Ukrainian delivery does not fit a flat address string, so the envelope nests the recipient under `customer` and makes delivery a discriminated choice.
 
 ```json
 {

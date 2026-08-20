@@ -4,7 +4,7 @@ import { renderOrder } from "../src/message.js";
 import { type RejectReason } from "../src/decode.js";
 import {
   parseOrder,
-  parseOrderPayload,
+  decodeEnvelopeBody,
   type OrderParseResult,
   type OrderPayload,
 } from "../src/payload.js";
@@ -86,7 +86,7 @@ const expectReject = (
   expectRejectedBody(buildOrder(overrides), reason);
 };
 
-describe("parseOrder version dispatch", () => {
+describe("parseOrder version gate", () => {
   it("rejects a body carrying no version at all", () => {
     const order = buildOrder();
 
@@ -1055,9 +1055,9 @@ describe("parseOrder delivery mode and locale independence", () => {
   });
 });
 
-describe("parseOrderPayload", () => {
+describe("decodeEnvelopeBody", () => {
   it("decodes a body handed straight to it", () => {
-    const payload = payloadOf(parseOrderPayload(buildOrder()));
+    const payload = payloadOf(decodeEnvelopeBody(buildOrder()));
 
     expect(payload).toBeDefined();
 
@@ -1067,12 +1067,12 @@ describe("parseOrderPayload", () => {
     }
   });
 
-  it("ignores the version key because dispatch already ruled on it", () => {
+  it("ignores the version key because the gate already ruled on it", () => {
     const order = buildOrder({ version: 99 });
 
     delete order["locale"];
 
-    const rejected = parseOrderPayload(order);
+    const rejected = decodeEnvelopeBody(order);
 
     expect(rejected.ok).toBe(false);
 
@@ -1080,7 +1080,7 @@ describe("parseOrderPayload", () => {
       expect(rejected.reason).toBe("locale_not_string");
     }
 
-    const payload = payloadOf(parseOrderPayload(buildOrder({ version: 99 })));
+    const payload = payloadOf(decodeEnvelopeBody(buildOrder({ version: 99 })));
 
     expect(payload).toBeDefined();
   });
@@ -1090,7 +1090,7 @@ describe("parseOrderPayload", () => {
 
     delete order["customer"];
 
-    const result = parseOrderPayload(order);
+    const result = decodeEnvelopeBody(order);
 
     expect(result.ok).toBe(false);
 
@@ -1101,7 +1101,7 @@ describe("parseOrderPayload", () => {
 });
 
 describe("the reject reason set", () => {
-  const DECLARED_REASONS: ReadonlySet<string> = new Set([
+  const DECLARED_REASONS: ReadonlySet<RejectReason> = new Set<RejectReason>([
     "body_not_object",
     "locale_not_string",
     "total_not_plain_decimal",
@@ -1174,6 +1174,7 @@ describe("the reject reason set", () => {
   ];
 
   const DELIVERY_KEYS: readonly string[] = [
+    "address",
     "mode",
     "source",
     "city",

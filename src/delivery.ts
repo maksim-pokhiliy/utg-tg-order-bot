@@ -1,4 +1,4 @@
-import { isRecord, readText, styleText, type RejectReason } from "./decode.js";
+import { isRecord, readText, type RejectReason } from "./decode.js";
 
 const DELIVERY_MODES = [
   "np_branch",
@@ -59,13 +59,13 @@ const numberedText = (
       : undefined;
   }
 
-  return styleText(input, key);
+  return readText(input, key);
 };
 
 const readSource = (
   input: Record<string, unknown>
 ): DeliverySource | undefined => {
-  const text = styleText(input, "source");
+  const text = readText(input, "source");
 
   return DELIVERY_SOURCES.find((candidate) => candidate === text);
 };
@@ -143,8 +143,8 @@ const readGeneric = (
 
   return {
     mode: "generic",
-    country: styleText(input, "country"),
-    state: styleText(input, "state"),
+    country: readText(input, "country"),
+    state: readText(input, "state"),
     city,
     address,
   };

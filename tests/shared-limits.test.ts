@@ -107,7 +107,7 @@ describe("the shared telegram budget", () => {
   });
 
   it("spends the same budget and marks the same way behind a free-form address", () => {
-    const v2 = render(
+    const message = render(
       buildOrder({
         locale: "uk",
         delivery: buildDeliveryGeneric(),
@@ -116,9 +116,9 @@ describe("the shared telegram budget", () => {
       })
     );
 
-    expect(v2.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-    expect(v2).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
-    expect(itemsIn(v2)).toBeGreaterThan(0);
+    expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+    expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
+    expect(itemsIn(message)).toBeGreaterThan(0);
   });
 
   it("never grows the cart when the header grows", () => {

@@ -31,9 +31,6 @@ export interface OrderCartItem {
   productUrl: string;
 }
 
-export type OptionalText =
-  { ok: true; value: string | undefined } | { ok: false };
-
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -52,23 +49,6 @@ export const readText = (
   const value = source[key];
 
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
-};
-
-export const readOptionalText = (
-  source: Record<string, unknown>,
-  key: string
-): OptionalText => {
-  const value = source[key];
-
-  if (value === undefined || value === null) {
-    return { ok: true, value: undefined };
-  }
-
-  if (typeof value !== "string") {
-    return { ok: false };
-  }
-
-  return { ok: true, value: value.trim() === "" ? undefined : value };
 };
 
 const parseCartItem = (input: unknown): OrderCartItem | undefined => {
@@ -121,13 +101,4 @@ export const parseCart = (
   }
 
   return items;
-};
-
-export const styleText = (
-  input: Record<string, unknown>,
-  key: string
-): string | undefined => {
-  const text = readOptionalText(input, key);
-
-  return text.ok ? text.value : undefined;
 };

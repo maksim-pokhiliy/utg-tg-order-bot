@@ -31,6 +31,7 @@ const WITHHELD = [
   "README.md",
   "CLAUDE.md",
   "tsconfig.smoke.json",
+  "tsconfig.test.json",
 ];
 
 const readModuleGraphDirectories = (): string[] => {

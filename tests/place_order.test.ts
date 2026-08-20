@@ -37,22 +37,6 @@ afterEach(() => {
 });
 
 describe("POST /api/place_order", () => {
-  it("relays a valid order and answers 200 with the frozen success body", async () => {
-    const fetchStub = stubTelegram();
-
-    const response = await POST(new StubRequest(buildOrder()));
-
-    expect(response.status).toBe(200);
-    await expect(readJson(response)).resolves.toEqual({ status: "success" });
-
-    const sent = readSentMessage(fetchStub);
-
-    expect(sent.url).toBe(TELEGRAM_URL);
-    expect(sent.chatId).toBe(CHAT_ID);
-    expect(sent.parseMode).toBe("HTML");
-    expect(sent.text).toContain("👤 <b>First Name:</b> Марія");
-  });
-
   it("answers 400 with the frozen error body and never echoes the input", async () => {
     const fetchStub = stubTelegram();
     const order = buildOrder({ cart: [] });
@@ -167,7 +151,7 @@ describe("POST /api/place_order", () => {
 
     expect(logged).toContain("total_not_plain_decimal");
     expect(logged).not.toContain("1e3");
-    expect(logged).not.toContain("Олександр");
+    expect(logged).not.toContain("Марія");
   });
 });
 
@@ -183,6 +167,7 @@ describe("POST /api/place_order with a full envelope", () => {
     const sent = readSentMessage(fetchStub);
 
     expect(sent.url).toBe(TELEGRAM_URL);
+    expect(sent.chatId).toBe(CHAT_ID);
     expect(sent.parseMode).toBe("HTML");
     expect(sent.text).toContain("👤 <b>First Name:</b> Марія");
     expect(sent.text).toContain("🚚 <b>Delivery:</b> Nova Poshta branch");
@@ -294,10 +279,10 @@ describe("POST /api/place_order with a full envelope", () => {
     const logged = joinLoggedLines(logs);
 
     expect(logged).toContain("delivery_building_missing");
-    expect(logged).not.toContain("required_field_missing");
+    expect(logged).not.toContain("customer_field_missing");
   });
 
-  it("rejects an unsupported version before either decoder runs", async () => {
+  it("rejects an unsupported version before the decoder runs", async () => {
     const logs = captureConsoleWarn();
 
     const response = await POST(new StubRequest(buildOrder({ version: "2" })));
@@ -307,7 +292,7 @@ describe("POST /api/place_order with a full envelope", () => {
     const logged = joinLoggedLines(logs);
 
     expect(logged).toContain("version_unsupported");
-    expect(logged).not.toContain("required_field_missing");
+    expect(logged).not.toContain("customer_not_object");
   });
 
   it("never echoes a field value into the response or the log", async () => {

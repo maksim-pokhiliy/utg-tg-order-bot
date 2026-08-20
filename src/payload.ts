@@ -5,7 +5,6 @@ import {
   isRecord,
   parseCart,
   readText,
-  styleText,
   type OrderCartItem,
   type PlainDecimal,
   type RejectReason,
@@ -65,13 +64,13 @@ const readCustomer = (input: unknown): OrderCustomer | RejectReason => {
   return {
     first_name,
     last_name,
-    patronymic: styleText(input, "patronymic"),
+    patronymic: readText(input, "patronymic"),
     phone,
-    contact_channel: styleText(input, "contact_channel"),
+    contact_channel: readText(input, "contact_channel"),
   };
 };
 
-export const parseOrderPayload = (
+export const decodeEnvelopeBody = (
   input: Record<string, unknown>
 ): OrderParseResult => {
   const customer = readCustomer(input["customer"]);
@@ -113,8 +112,8 @@ export const parseOrderPayload = (
       payload: {
         customer,
         delivery,
-        comment: styleText(input, "comment"),
-        idempotency_key: styleText(input, "idempotency_key"),
+        comment: readText(input, "comment"),
+        idempotency_key: readText(input, "idempotency_key"),
         locale,
         total,
         currency,
@@ -133,5 +132,5 @@ export const parseOrder = (input: unknown): OrderParseResult => {
     return reject("version_unsupported");
   }
 
-  return parseOrderPayload(input);
+  return decodeEnvelopeBody(input);
 };
