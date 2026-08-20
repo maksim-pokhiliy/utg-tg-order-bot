@@ -1,9 +1,4 @@
-import {
-  isRecord,
-  readOptionalText,
-  readText,
-  type RejectReason,
-} from "./decode.js";
+import { isRecord, readText, styleText, type RejectReason } from "./decode.js";
 
 const DELIVERY_MODES = [
   "np_branch",
@@ -51,15 +46,6 @@ export type OrderDelivery =
 const isDeliveryMode = (value: unknown): value is DeliveryMode =>
   typeof value === "string" &&
   DELIVERY_MODES.some((candidate) => candidate === value);
-
-const styleText = (
-  input: Record<string, unknown>,
-  key: string
-): string | undefined => {
-  const text = readOptionalText(input, key);
-
-  return text.ok ? text.value : undefined;
-};
 
 const numberedText = (
   input: Record<string, unknown>,

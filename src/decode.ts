@@ -122,3 +122,12 @@ export const parseCart = (
 
   return items;
 };
+
+export const styleText = (
+  input: Record<string, unknown>,
+  key: string
+): string | undefined => {
+  const text = readOptionalText(input, key);
+
+  return text.ok ? text.value : undefined;
+};

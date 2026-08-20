@@ -4,8 +4,8 @@ import {
   isPlainDecimal,
   isRecord,
   parseCart,
-  readOptionalText,
   readText,
+  styleText,
   type OrderCartItem,
   type PlainDecimal,
   type RejectReason,
@@ -44,15 +44,6 @@ const reject = (reason: RejectReason): OrderParseResult => ({
   ok: false,
   reason,
 });
-
-const styleText = (
-  input: Record<string, unknown>,
-  key: string
-): string | undefined => {
-  const text = readOptionalText(input, key);
-
-  return text.ok ? text.value : undefined;
-};
 
 const readCustomer = (input: unknown): OrderCustomer | RejectReason => {
   if (!isRecord(input)) {

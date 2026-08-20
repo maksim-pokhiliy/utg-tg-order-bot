@@ -11,13 +11,6 @@ import {
   type SentMessage,
 } from "./telegram.js";
 
-export {
-  captureConsoleError,
-  captureConsoleWarn,
-  joinLoggedLines,
-  type SentMessage,
-};
-
 export const NEON_HOST = "ep-b5-executor-pooler.us-east-1.aws.neon.tech";
 export const NEON_PASSWORD = "not-a-real-password";
 export const TEST_DATABASE_URL = `postgresql://relay_owner:${NEON_PASSWORD}@${NEON_HOST}/neondb?sslmode=require`;

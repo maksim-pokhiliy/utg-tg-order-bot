@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { clampEscaped, escapeHtml, formatTotal } from "../src/render.js";
+import type { OrderCartItem } from "../src/decode.js";
+import {
+  clampEscaped,
+  composeMessage,
+  escapeHtml,
+  formatTotal,
+} from "../src/render.js";
 
 const NBSP = " ";
 
@@ -80,5 +86,35 @@ describe("clampEscaped", () => {
 
     expect(clamped).toBe("🎯…");
     expect(clamped).not.toMatch(/[\uD800-\uDFFF]/u);
+  });
+});
+
+describe("composeMessage when the header leaves no room for the cart", () => {
+  const cartLine = (title: string): OrderCartItem => ({
+    title,
+    quantity: 1,
+    productUrl: "https://s.test/p",
+  });
+
+  it("emits the header and the omitted marker with no dangling separator", () => {
+    const message = composeMessage(
+      ["👤 <b>First Name:</b> " + "ф".repeat(4000)],
+      [cartLine("A"), cartLine("B")]
+    );
+
+    expect(message).toMatch(/… <b>\+2 more positions<\/b>$/u);
+    expect(message).not.toContain("🏷️ <b>Title:</b>");
+    expect(message).not.toMatch(/\n\n… <b>\+/u);
+  });
+
+  it("still renders the cart when the header does leave room", () => {
+    const message = composeMessage(
+      ["👤 <b>First Name:</b> Марія"],
+      [cartLine("A"), cartLine("B")]
+    );
+
+    expect(message).toContain("🏷️ <b>Title:</b> A");
+    expect(message).toContain("🏷️ <b>Title:</b> B");
+    expect(message).not.toMatch(/more positions/u);
   });
 });

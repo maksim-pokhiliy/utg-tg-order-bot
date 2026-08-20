@@ -8,19 +8,19 @@ import type {
 import type { OrderCartItem } from "../../src/decode.js";
 import type { OrderCustomer, OrderPayload } from "../../src/payload.js";
 
-export type Saturated<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
+type Saturated<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
 
 const ASTRAL = "🎯";
 const FILLER = ASTRAL.repeat(1000);
 const SATURATED_CART_SIZE = 40;
 
-export const saturatedCartItem = (index: number): Saturated<OrderCartItem> => ({
+const saturatedCartItem = (index: number): Saturated<OrderCartItem> => ({
   title: `${String(index)}${FILLER}`,
   quantity: 100000,
   productUrl: `https://s.test/${FILLER}`,
 });
 
-export const saturatedCart: readonly OrderCartItem[] = Array.from(
+const saturatedCart: readonly OrderCartItem[] = Array.from(
   { length: SATURATED_CART_SIZE },
   (_, index) => saturatedCartItem(index)
 );

@@ -4,12 +4,13 @@ import { POST } from "../api/place_order.js";
 import {
   BOT_TOKEN,
   BrokenBodyRequest,
+  buildCartItem,
   buildDeliveryCourier,
   buildDeliveryGeneric,
-  buildCartItem,
   buildOrder,
   CHAT_ID,
   JsonBodyRequest,
+  RELAY_URL,
   StubRequest,
   TELEGRAM_URL,
 } from "./support/orderPayload.js";
@@ -197,6 +198,41 @@ describe("POST /api/place_order with a full envelope", () => {
     expect(readSentMessage(fetchStub).text).toContain(
       "🔎 <b>Address Source:</b> Nova Poshta directory"
     );
+  });
+
+  it("refuses a serialised body the decoder rejects, off the wire", async () => {
+    const fetchStub = stubTelegram();
+
+    const response = await POST(
+      new JsonBodyRequest(buildOrder({ total: "1e3" }))
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe('{"status":"error"}');
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it("refuses a serialised body carrying no version, off the wire", async () => {
+    const order = buildOrder();
+
+    delete order["version"];
+
+    stubTelegram();
+
+    const response = await POST(new JsonBodyRequest(order));
+
+    expect(response.status).toBe(400);
+  });
+
+  it("answers 400 to a real POST that carries no body at all", async () => {
+    const fetchStub = stubTelegram();
+
+    const response = await POST(
+      new Request(RELAY_URL, { method: "POST", body: null })
+    );
+
+    expect(response.status).toBe(400);
+    expect(fetchStub).not.toHaveBeenCalled();
   });
 
   it("refuses a v1-shaped body and never reaches telegram with it", async () => {
