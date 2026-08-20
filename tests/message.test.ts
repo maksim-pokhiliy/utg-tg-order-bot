@@ -351,6 +351,96 @@ describe("the rendered order message", () => {
   });
 });
 
+const BOLD_RUN = /<b>([^<]*)<\/b>/gu;
+
+const labelsOf = (message: string): readonly string[] =>
+  [...message.matchAll(BOLD_RUN)].map((match) => match[1] ?? "");
+
+const BRANCH_LABEL_SEQUENCE: readonly string[] = [
+  "First Name:",
+  "Last Name:",
+  "Patronymic:",
+  "Telephone:",
+  "Preferred Contact:",
+  "Delivery:",
+  "Address Source:",
+  "City:",
+  "Warehouse:",
+  "Warehouse No:",
+  "Total:",
+  "Additional Information:",
+  "Products:",
+  "Title:",
+  "Quantity:",
+  "Product URL:",
+];
+
+const COURIER_LABEL_SEQUENCE: readonly string[] = [
+  "First Name:",
+  "Last Name:",
+  "Patronymic:",
+  "Telephone:",
+  "Preferred Contact:",
+  "Delivery:",
+  "Address Source:",
+  "City:",
+  "Street:",
+  "Building:",
+  "Apartment:",
+  "Total:",
+  "Additional Information:",
+  "Products:",
+  "Title:",
+  "Quantity:",
+  "Product URL:",
+];
+
+const GENERIC_LABEL_SEQUENCE: readonly string[] = [
+  "First Name:",
+  "Last Name:",
+  "Patronymic:",
+  "Telephone:",
+  "Preferred Contact:",
+  "Delivery:",
+  "Address Source:",
+  "Country:",
+  "State:",
+  "City:",
+  "Address:",
+  "Total:",
+  "Additional Information:",
+  "Products:",
+  "Title:",
+  "Quantity:",
+  "Product URL:",
+];
+
+describe("the label sequence the operator reads", () => {
+  it("renders the branch labels in order, with nothing extra", () => {
+    expect(
+      labelsOf(render(buildOrder({ delivery: buildDeliveryBranch() })))
+    ).toEqual(BRANCH_LABEL_SEQUENCE);
+  });
+
+  it("renders the parcel locker labels in order, with nothing extra", () => {
+    expect(
+      labelsOf(render(buildOrder({ delivery: buildDeliveryPostomat() })))
+    ).toEqual(BRANCH_LABEL_SEQUENCE);
+  });
+
+  it("renders the courier labels in order, with nothing extra", () => {
+    expect(
+      labelsOf(render(buildOrder({ delivery: buildDeliveryCourier() })))
+    ).toEqual(COURIER_LABEL_SEQUENCE);
+  });
+
+  it("renders the free-form labels in order, with nothing extra", () => {
+    expect(
+      labelsOf(render(buildOrder({ delivery: buildDeliveryGeneric() })))
+    ).toEqual(GENERIC_LABEL_SEQUENCE);
+  });
+});
+
 describe("the idempotency key", () => {
   it("never reaches the operator as a recognisable literal", () => {
     for (const delivery of CLEAN_DELIVERIES) {
