@@ -2,7 +2,6 @@ import type { DeliveryMode, OrderDelivery } from "./delivery.js";
 import {
   additionalLine,
   addressLine,
-  buildOrderMessage,
   cityLine,
   composeMessage,
   countryLine,
@@ -135,6 +134,4 @@ const buildOrderMessageV2 = (payload: OrderPayloadV2): string =>
   composeMessage(buildHeaderV2(payload), payload.cart);
 
 export const renderOrder = (envelope: OrderEnvelope): string =>
-  envelope.kind === "v1"
-    ? buildOrderMessage(envelope.payload)
-    : buildOrderMessageV2(envelope.payload);
+  buildOrderMessageV2(envelope.payload);

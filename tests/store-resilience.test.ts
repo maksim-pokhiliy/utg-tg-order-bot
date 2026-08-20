@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../api/place_order.js";
 import {
   BOT_TOKEN,
-  buildOrderV2,
+  buildOrder,
   CHAT_ID,
   StubRequest,
 } from "./support/orderPayload.js";
@@ -60,7 +60,7 @@ describe("the store can never gate the send", () => {
     try {
       const { POST: guarded } = await import("../api/place_order.js");
 
-      const response = await guarded(new StubRequest(buildOrderV2()));
+      const response = await guarded(new StubRequest(buildOrder()));
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toBe("application/json");
@@ -98,7 +98,7 @@ describe("the store can never gate the send", () => {
     try {
       const { POST: guarded } = await import("../api/place_order.js");
 
-      const response = await guarded(new StubRequest(buildOrderV2()));
+      const response = await guarded(new StubRequest(buildOrder()));
 
       expect(response.status).toBe(200);
       await expect(response.text()).resolves.toBe(FROZEN_SUCCESS);
@@ -132,7 +132,7 @@ describe("the store can never gate the send", () => {
     try {
       const { POST: guarded } = await import("../api/place_order.js");
 
-      const response = await guarded(new StubRequest(buildOrderV2()));
+      const response = await guarded(new StubRequest(buildOrder()));
 
       expect(response.status).toBe(200);
       await expect(response.text()).resolves.toBe(FROZEN_SUCCESS);
@@ -166,7 +166,7 @@ describe("the store can never gate the send", () => {
     try {
       const { POST: guarded } = await import("../api/place_order.js");
 
-      const response = await guarded(new StubRequest(buildOrderV2()));
+      const response = await guarded(new StubRequest(buildOrder()));
 
       expect(response.status).toBe(200);
       await expect(response.text()).resolves.toBe(FROZEN_SUCCESS);
@@ -191,7 +191,7 @@ describe("a dead database costs an audit row, never an order", () => {
       },
     });
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe(FROZEN_SUCCESS);
@@ -216,7 +216,7 @@ describe("a dead database costs an audit row, never an order", () => {
       },
     });
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe(FROZEN_SUCCESS);
@@ -235,7 +235,7 @@ describe("a dead database costs an audit row, never an order", () => {
       },
     });
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe(FROZEN_SUCCESS);
@@ -253,7 +253,7 @@ describe("a dead database costs an audit row, never an order", () => {
       },
     });
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(500);
     await expect(response.text()).resolves.toBe('{"status":"error"}');

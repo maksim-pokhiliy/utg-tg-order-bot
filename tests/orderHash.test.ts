@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import { canonicalize, hashOrder } from "../src/orderHash.js";
 import {
   buildCartLine,
-  buildEnvelopeV1,
-  buildEnvelopeV2,
+  buildEnvelope,
   PINNED_ENVELOPE,
   PINNED_HASH,
 } from "./support/envelope.js";
@@ -41,8 +40,8 @@ describe("the canonical serialization", () => {
 describe("the content hash", () => {
   it("hashes two envelopes that differ only by their idempotency key identically", () => {
     const first = hashOrder(PINNED_ENVELOPE);
-    const second = hashOrder(buildEnvelopeV2({ idempotency_key: "other-key" }));
-    const third = hashOrder(buildEnvelopeV2({ idempotency_key: undefined }));
+    const second = hashOrder(buildEnvelope({ idempotency_key: "other-key" }));
+    const third = hashOrder(buildEnvelope({ idempotency_key: undefined }));
 
     expect(first).toBe(second);
     expect(first).toBe(third);
@@ -55,15 +54,13 @@ describe("the content hash", () => {
   });
 
   it("changes when the money figure changes", () => {
-    expect(hashOrder(buildEnvelopeV2({ total: "300.00" }))).not.toBe(
-      PINNED_HASH
-    );
+    expect(hashOrder(buildEnvelope({ total: "300.00" }))).not.toBe(PINNED_HASH);
   });
 
   it("changes when the cart gains a line", () => {
     expect(
       hashOrder(
-        buildEnvelopeV2({
+        buildEnvelope({
           cart: [buildCartLine(), buildCartLine({ title: "Другий" })],
         })
       )
@@ -72,11 +69,11 @@ describe("the content hash", () => {
 
   it("changes when a cart line is removed", () => {
     const twoLines = hashOrder(
-      buildEnvelopeV2({
+      buildEnvelope({
         cart: [buildCartLine(), buildCartLine({ title: "Другий" })],
       })
     );
-    const oneLine = hashOrder(buildEnvelopeV2({ cart: [buildCartLine()] }));
+    const oneLine = hashOrder(buildEnvelope({ cart: [buildCartLine()] }));
 
     expect(oneLine).not.toBe(twoLines);
     expect(oneLine).toBe(PINNED_HASH);
@@ -84,18 +81,18 @@ describe("the content hash", () => {
 
   it("changes when the quantity of a line changes", () => {
     expect(
-      hashOrder(buildEnvelopeV2({ cart: [buildCartLine({ quantity: 3 })] }))
+      hashOrder(buildEnvelope({ cart: [buildCartLine({ quantity: 3 })] }))
     ).not.toBe(PINNED_HASH);
   });
 
   it("changes when two cart lines swap places", () => {
     const forward = hashOrder(
-      buildEnvelopeV2({
+      buildEnvelope({
         cart: [buildCartLine(), buildCartLine({ title: "Другий" })],
       })
     );
     const reversed = hashOrder(
-      buildEnvelopeV2({
+      buildEnvelope({
         cart: [buildCartLine({ title: "Другий" }), buildCartLine()],
       })
     );
@@ -104,13 +101,6 @@ describe("the content hash", () => {
   });
 
   it("treats an absent optional field and an explicitly undefined one as the same order", () => {
-    expect(hashOrder(buildEnvelopeV2({ comment: undefined }))).toBe(
-      PINNED_HASH
-    );
-  });
-
-  it("gives a v1 and a v2 envelope different identities", () => {
-    expect(hashOrder(buildEnvelopeV1())).not.toBe(hashOrder(PINNED_ENVELOPE));
-    expect(hashOrder(buildEnvelopeV1())).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashOrder(buildEnvelope({ comment: undefined }))).toBe(PINNED_HASH);
   });
 });

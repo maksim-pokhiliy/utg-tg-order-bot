@@ -1,26 +1,12 @@
-const REQUIRED_TEXT_KEYS = [
-  "first_name",
-  "last_name",
-  "telephone",
-  "country",
-  "state",
-  "city",
-  "address",
-] as const;
-
 const TOTAL_PATTERN = /^\d+(\.\d+)?$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 const MAX_TOTAL_LENGTH = 20;
 const MAX_QUANTITY = 100_000;
 
-type RequiredTextKey = (typeof REQUIRED_TEXT_KEYS)[number];
-
 export type PlainDecimal = `${number}`;
 
 export type RejectReason =
   | "body_not_object"
-  | "required_field_missing"
-  | "additional_not_string"
   | "locale_not_string"
   | "total_not_plain_decimal"
   | "currency_malformed"
@@ -45,23 +31,8 @@ export interface OrderCartItem {
   productUrl: string;
 }
 
-export type OrderContact = Record<RequiredTextKey, string>;
-
-export interface OrderPayload extends OrderContact {
-  additional: string;
-  locale: string;
-  total: PlainDecimal;
-  currency: string | undefined;
-  cart: readonly OrderCartItem[];
-}
-
-export type ParseResult =
-  { ok: true; value: OrderPayload } | { ok: false; reason: RejectReason };
-
 export type OptionalText =
   { ok: true; value: string | undefined } | { ok: false };
-
-const reject = (reason: RejectReason): ParseResult => ({ ok: false, reason });
 
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -98,40 +69,6 @@ export const readOptionalText = (
   }
 
   return { ok: true, value: value.trim() === "" ? undefined : value };
-};
-
-const readContact = (
-  source: Record<string, unknown>
-): OrderContact | undefined => {
-  const first_name = readText(source, "first_name");
-  const last_name = readText(source, "last_name");
-  const telephone = readText(source, "telephone");
-  const country = readText(source, "country");
-  const state = readText(source, "state");
-  const city = readText(source, "city");
-  const address = readText(source, "address");
-
-  if (
-    first_name === undefined ||
-    last_name === undefined ||
-    telephone === undefined ||
-    country === undefined ||
-    state === undefined ||
-    city === undefined ||
-    address === undefined
-  ) {
-    return undefined;
-  }
-
-  return {
-    first_name,
-    last_name,
-    telephone,
-    country,
-    state,
-    city,
-    address,
-  };
 };
 
 const parseCartItem = (input: unknown): OrderCartItem | undefined => {
@@ -184,52 +121,4 @@ export const parseCart = (
   }
 
   return items;
-};
-
-export const parseOrderPayload = (input: unknown): ParseResult => {
-  if (!isRecord(input)) {
-    return reject("body_not_object");
-  }
-
-  const contact = readContact(input);
-
-  if (contact === undefined) {
-    return reject("required_field_missing");
-  }
-
-  const { additional, locale, total, currency } = input;
-
-  if (additional !== undefined && typeof additional !== "string") {
-    return reject("additional_not_string");
-  }
-
-  if (typeof locale !== "string") {
-    return reject("locale_not_string");
-  }
-
-  if (!isPlainDecimal(total)) {
-    return reject("total_not_plain_decimal");
-  }
-
-  if (currency !== undefined && !isCurrencyCode(currency)) {
-    return reject("currency_malformed");
-  }
-
-  const cart = parseCart(input["cart"]);
-
-  if (typeof cart === "string") {
-    return reject(cart);
-  }
-
-  return {
-    ok: true,
-    value: {
-      ...contact,
-      additional: additional ?? "",
-      locale,
-      total,
-      currency,
-      cart,
-    },
-  };
 };

@@ -25,13 +25,10 @@ export const canonicalize = (value: unknown): string => {
   return JSON.stringify(value) ?? "null";
 };
 
-const withoutKey = (envelope: OrderEnvelope): OrderEnvelope =>
-  envelope.kind === "v1"
-    ? envelope
-    : {
-        kind: "v2",
-        payload: { ...envelope.payload, idempotency_key: undefined },
-      };
+const withoutKey = (envelope: OrderEnvelope): OrderEnvelope => ({
+  kind: "v2",
+  payload: { ...envelope.payload, idempotency_key: undefined },
+});
 
 export const hashOrder = (envelope: OrderEnvelope): string =>
   createHash("sha256")

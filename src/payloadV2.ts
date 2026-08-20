@@ -4,16 +4,13 @@ import {
   isPlainDecimal,
   isRecord,
   parseCart,
-  parseOrderPayload,
   readOptionalText,
   readText,
   type OrderCartItem,
-  type OrderPayload,
   type PlainDecimal,
   type RejectReason,
 } from "./payload.js";
 
-const V1_VERSION = 1;
 const V2_VERSION = 2;
 
 export interface OrderCustomer {
@@ -35,17 +32,12 @@ export interface OrderPayloadV2 {
   cart: readonly OrderCartItem[];
 }
 
-export interface OrderEnvelopeV1 {
-  kind: "v1";
-  payload: OrderPayload;
-}
-
 export interface OrderEnvelopeV2 {
   kind: "v2";
   payload: OrderPayloadV2;
 }
 
-export type OrderEnvelope = OrderEnvelopeV1 | OrderEnvelopeV2;
+export type OrderEnvelope = OrderEnvelopeV2;
 
 export type OrderParseResult =
   { ok: true; value: OrderEnvelope } | { ok: false; reason: RejectReason };
@@ -148,19 +140,9 @@ export const parseOrder = (input: unknown): OrderParseResult => {
     return reject("body_not_object");
   }
 
-  const version = input["version"];
-
-  if (version === V2_VERSION) {
-    return parseOrderPayloadV2(input);
-  }
-
-  if (version !== undefined && version !== V1_VERSION) {
+  if (input["version"] !== V2_VERSION) {
     return reject("version_unsupported");
   }
 
-  const parsed = parseOrderPayload(input);
-
-  return parsed.ok
-    ? { ok: true, value: { kind: "v1", payload: parsed.value } }
-    : { ok: false, reason: parsed.reason };
+  return parseOrderPayloadV2(input);
 };

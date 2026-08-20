@@ -10,8 +10,7 @@ export const STORE_MARK_TIMEOUT_MS = 2_500;
 export const DEDUPE_WINDOW_SECONDS = 1_800;
 export const MAX_PAYLOAD_CHARS = 262_144;
 
-const SCHEMA_VERSION_V1 = 1;
-const SCHEMA_VERSION_V2 = 2;
+const SCHEMA_VERSION = 2;
 const HASH_LOG_PREFIX = 12;
 const KEY_LOG_PREFIX = 8;
 
@@ -78,10 +77,7 @@ const logStored = (detail: Record<string, unknown>): void => {
 };
 
 const readAttemptKey = (envelope: OrderEnvelope): string | undefined =>
-  envelope.kind === "v2" ? envelope.payload.idempotency_key : undefined;
-
-const readSchemaVersion = (envelope: OrderEnvelope): number =>
-  envelope.kind === "v2" ? SCHEMA_VERSION_V2 : SCHEMA_VERSION_V1;
+  envelope.payload.idempotency_key;
 
 const readText = (row: Record<string, unknown>, key: string): string | null => {
   const value = row[key];
@@ -142,7 +138,7 @@ interface RowParams {
 const readRowParams = (attempt: OrderAttempt): RowParams => ({
   contentHash: attempt.contentHash,
   key: readAttemptKey(attempt.envelope) ?? null,
-  schemaVersion: readSchemaVersion(attempt.envelope),
+  schemaVersion: SCHEMA_VERSION,
   payload: JSON.stringify(attempt.envelope),
 });
 

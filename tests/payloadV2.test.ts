@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { renderOrder } from "../src/messageV2.js";
-import { parseOrderPayload, type RejectReason } from "../src/payload.js";
+import { type RejectReason } from "../src/payload.js";
 import {
   parseOrder,
   parseOrderPayloadV2,
@@ -16,10 +16,27 @@ import {
   buildDeliveryGeneric,
   buildDeliveryPostomat,
   buildOrder,
-  buildOrderV2,
 } from "./support/orderPayload.js";
 
 const CONTRACT_IDEMPOTENCY_KEY = "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731";
+
+const GARBAGE_TOTALS: readonly unknown[] = [
+  "",
+  [],
+  null,
+  false,
+  true,
+  [5],
+  "1e3",
+  "0x10",
+  " 12 ",
+  "Infinity",
+  "-1",
+  "abc",
+  {},
+  46200,
+  undefined,
+];
 
 const BLANK_TEXTS: readonly string[] = ["", "   "];
 
@@ -50,7 +67,7 @@ const payloadOf = (result: OrderParseResult): OrderPayloadV2 | undefined => {
 
 const decodeV2 = (
   overrides: Record<string, unknown> = {}
-): OrderPayloadV2 | undefined => payloadOf(parseOrder(buildOrderV2(overrides)));
+): OrderPayloadV2 | undefined => payloadOf(parseOrder(buildOrder(overrides)));
 
 const expectRejectedBody = (body: unknown, reason: RejectReason): void => {
   const result = parseOrder(body);
@@ -66,32 +83,43 @@ const expectReject = (
   overrides: Record<string, unknown>,
   reason: RejectReason
 ): void => {
-  expectRejectedBody(buildOrderV2(overrides), reason);
+  expectRejectedBody(buildOrder(overrides), reason);
 };
 
 describe("parseOrder version dispatch", () => {
-  it("routes a body without a version to the v1 decoder", () => {
+  it("rejects a body carrying no version at all", () => {
+    const order = buildOrder();
+
+    delete order["version"];
+
+    expectRejectedBody(order, "version_unsupported");
+  });
+
+  it("rejects the retired version 1 like any other version it does not speak", () => {
+    expectRejectedBody(buildOrder({ version: 1 }), "version_unsupported");
+  });
+
+  it("rejects a v1-shaped body through the ordinary path, with no bespoke reason", () => {
+    const legacyBody = {
+      first_name: "Олександр",
+      last_name: "Петренко",
+      telephone: "+380671234567",
+      country: "Україна",
+      state: "Київська область",
+      city: "Київ",
+      address: "вул. Шевченка, 12, кв. 5",
+      additional: "",
+      locale: "uk",
+      total: "46200.00",
+      currency: "UAH",
+      cart: [buildCartItem()],
+    };
+
+    expectRejectedBody(legacyBody, "version_unsupported");
+  });
+
+  it("routes version 2 to the decoder", () => {
     const result = parseOrder(buildOrder());
-
-    expect(result.ok).toBe(true);
-
-    if (result.ok) {
-      expect(result.value.kind).toBe("v1");
-    }
-  });
-
-  it("routes version 1 to the v1 decoder", () => {
-    const result = parseOrder(buildOrder({ version: 1 }));
-
-    expect(result.ok).toBe(true);
-
-    if (result.ok) {
-      expect(result.value.kind).toBe("v1");
-    }
-  });
-
-  it("routes version 2 to the v2 decoder", () => {
-    const result = parseOrder(buildOrderV2());
 
     expect(result.ok).toBe(true);
 
@@ -103,7 +131,7 @@ describe("parseOrder version dispatch", () => {
   it("routes version 2.0 to the v2 decoder because 2.0 is the number 2", () => {
     expect(2.0).toBe(2);
 
-    const result = parseOrder(buildOrderV2({ version: 2.0 }));
+    const result = parseOrder(buildOrder({ version: 2.0 }));
 
     expect(result.ok).toBe(true);
 
@@ -114,38 +142,28 @@ describe("parseOrder version dispatch", () => {
 
   it("rejects a version that is a string even when it spells a supported one", () => {
     for (const version of ["2", "1"]) {
-      expectRejectedBody(buildOrderV2({ version }), "version_unsupported");
+      expectRejectedBody(buildOrder({ version }), "version_unsupported");
     }
   });
 
   it("rejects a version the relay does not speak", () => {
     for (const version of [99, null, true]) {
-      expectRejectedBody(buildOrderV2({ version }), "version_unsupported");
+      expectRejectedBody(buildOrder({ version }), "version_unsupported");
     }
   });
 
-  it("judges the version before either decoder runs", () => {
-    const result = parseOrder(buildOrderV2({ version: 99 }));
+  it("judges the version before the decoder runs", () => {
+    const order = buildOrder({ version: 99 });
+
+    delete order["customer"];
+
+    const result = parseOrder(order);
 
     expect(result.ok).toBe(false);
 
     if (!result.ok) {
       expect(result.reason).toBe("version_unsupported");
-      expect(result.reason).not.toBe("required_field_missing");
-    }
-  });
-
-  it("hands back the payload the v1 decoder produced", () => {
-    const order = buildOrder();
-    const envelope = parseOrder(order);
-    const direct = parseOrderPayload(order);
-
-    expect(envelope.ok).toBe(true);
-    expect(direct.ok).toBe(true);
-
-    if (envelope.ok && envelope.value.kind === "v1" && direct.ok) {
-      expect(envelope.value.payload).toStrictEqual(direct.value);
-      expect(envelope.value.payload.cart).toStrictEqual(direct.value.cart);
+      expect(result.reason).not.toBe("customer_not_object");
     }
   });
 });
@@ -318,7 +336,7 @@ describe("parseOrder v2 optional fields that are absent", () => {
   });
 
   it("accepts an order with no comment", () => {
-    const order = buildOrderV2();
+    const order = buildOrder();
 
     delete order["comment"];
 
@@ -496,7 +514,7 @@ describe("parseOrder v2 idempotency key", () => {
   });
 
   it("accepts an order that carries no idempotency key", () => {
-    const order = buildOrderV2();
+    const order = buildOrder();
 
     delete order["idempotency_key"];
 
@@ -545,14 +563,14 @@ describe("parseOrder v2 idempotency key", () => {
 
   it("never turns an idempotency key into a rejection, whatever it holds", () => {
     for (const idempotency_key of HOSTILE_IDEMPOTENCY_KEYS) {
-      expect(parseOrder(buildOrderV2({ idempotency_key })).ok).toBe(true);
+      expect(parseOrder(buildOrder({ idempotency_key })).ok).toBe(true);
     }
   });
 });
 
 describe("parseOrder v2 rejections", () => {
   it("rejects an order with no customer", () => {
-    const order = buildOrderV2();
+    const order = buildOrder();
 
     delete order["customer"];
 
@@ -588,7 +606,7 @@ describe("parseOrder v2 rejections", () => {
   });
 
   it("rejects an order with no delivery", () => {
-    const order = buildOrderV2();
+    const order = buildOrder();
 
     delete order["delivery"];
 
@@ -797,24 +815,108 @@ describe("parseOrder v2 style-only fields fail open", () => {
 });
 
 describe("parseOrder shared payload rules on the v2 path", () => {
-  it("rejects a total that is not a plain decimal", () => {
-    expectReject({ total: "1e3" }, "total_not_plain_decimal");
+  it("rejects every coercible total that would render a plausible figure", () => {
+    for (const total of GARBAGE_TOTALS) {
+      expectReject({ total }, "total_not_plain_decimal");
+    }
+  });
+
+  it("rejects a total with more digits than money can have", () => {
+    expectReject({ total: "9".repeat(400) }, "total_not_plain_decimal");
+    expectReject({ total: "9".repeat(21) }, "total_not_plain_decimal");
+  });
+
+  it("accepts a total right at the digit bound", () => {
+    const payload = decodeV2({ total: "9".repeat(20) });
+
+    expect(payload).toBeDefined();
+
+    if (payload) {
+      expect(payload.total).toBe("9".repeat(20));
+    }
   });
 
   it("rejects a malformed currency code", () => {
-    expectReject({ currency: "ua" }, "currency_malformed");
+    for (const currency of ["UAHX", "ua", "U1H", "", 42]) {
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
+  it("accepts an absent currency so the locale map can take over", () => {
+    const order = buildOrder();
+
+    delete order["currency"];
+
+    const payload = payloadOf(parseOrder(order));
+
+    expect(payload).toBeDefined();
+
+    if (payload) {
+      expect(payload.currency).toBeUndefined();
+    }
   });
 
   it("rejects a non-string locale", () => {
     expectReject({ locale: 42 }, "locale_not_string");
   });
 
+  it("accepts an unknown but valid locale", () => {
+    expect(decodeV2({ locale: "pl" })).toBeDefined();
+  });
+
   it("rejects a cart that is not an array", () => {
     expectReject({ cart: {} }, "cart_not_array");
+    expectReject({ cart: { title: "x" } }, "cart_not_array");
   });
 
   it("rejects an empty cart", () => {
     expectReject({ cart: [] }, "cart_empty");
+  });
+
+  it("rejects a cart item that is not an object", () => {
+    expectReject({ cart: ["patch"] }, "cart_item_malformed");
+  });
+
+  it("rejects a cart item with an empty title", () => {
+    expectReject(
+      { cart: [buildCartItem({ title: "  " })] },
+      "cart_item_malformed"
+    );
+  });
+
+  it("rejects an empty product url", () => {
+    for (const productUrl of ["", "   "]) {
+      expectReject(
+        { cart: [buildCartItem({ productUrl })] },
+        "cart_item_malformed"
+      );
+    }
+  });
+
+  it("rejects a cart item with a non-string productUrl", () => {
+    const item = buildCartItem();
+
+    item["productUrl"] = null;
+
+    expectReject({ cart: [item] }, "cart_item_malformed");
+  });
+
+  it("rejects a quantity beyond any sane order", () => {
+    for (const quantity of [1e21, 100_001, Number.MAX_SAFE_INTEGER]) {
+      expectReject(
+        { cart: [buildCartItem({ quantity })] },
+        "cart_item_malformed"
+      );
+    }
+  });
+
+  it("rejects a non-integer or non-positive quantity", () => {
+    for (const quantity of [0, -1, 1.5]) {
+      expectReject(
+        { cart: [buildCartItem({ quantity })] },
+        "cart_item_malformed"
+      );
+    }
   });
 
   it("rejects a cart item whose quantity is a numeric string", () => {
@@ -957,7 +1059,7 @@ describe("parseOrder v2 delivery mode and locale independence", () => {
 
 describe("parseOrderPayloadV2", () => {
   it("decodes a v2 body handed straight to it", () => {
-    const payload = payloadOf(parseOrderPayloadV2(buildOrderV2()));
+    const payload = payloadOf(parseOrderPayloadV2(buildOrder()));
 
     expect(payload).toBeDefined();
 
@@ -968,7 +1070,7 @@ describe("parseOrderPayloadV2", () => {
   });
 
   it("ignores the version key because dispatch already ruled on it", () => {
-    const order = buildOrderV2({ version: 1 });
+    const order = buildOrder({ version: 99 });
 
     delete order["locale"];
 
@@ -980,15 +1082,13 @@ describe("parseOrderPayloadV2", () => {
       expect(rejected.reason).toBe("locale_not_string");
     }
 
-    const payload = payloadOf(
-      parseOrderPayloadV2(buildOrderV2({ version: 1 }))
-    );
+    const payload = payloadOf(parseOrderPayloadV2(buildOrder({ version: 99 })));
 
     expect(payload).toBeDefined();
   });
 
   it("names the v2 reason without any dispatch help", () => {
-    const order = buildOrderV2();
+    const order = buildOrder();
 
     delete order["customer"];
 
@@ -1005,8 +1105,6 @@ describe("parseOrderPayloadV2", () => {
 describe("the reject reason set", () => {
   const DECLARED_REASONS: ReadonlySet<string> = new Set([
     "body_not_object",
-    "required_field_missing",
-    "additional_not_string",
     "locale_not_string",
     "total_not_plain_decimal",
     "currency_malformed",
@@ -1096,29 +1194,27 @@ describe("the reject reason set", () => {
 
     for (const key of TOP_KEYS) {
       for (const value of HOSTILE_VALUES) {
-        out.push(buildOrderV2({ [key]: value }));
+        out.push(buildOrder({ [key]: value }));
       }
     }
 
     for (const key of CUSTOMER_KEYS) {
       for (const value of HOSTILE_VALUES) {
-        out.push(buildOrderV2({ customer: buildCustomerV2({ [key]: value }) }));
+        out.push(buildOrder({ customer: buildCustomerV2({ [key]: value }) }));
       }
     }
 
     for (const build of DELIVERY_BUILDERS) {
       for (const key of DELIVERY_KEYS) {
         for (const value of HOSTILE_VALUES) {
-          out.push(buildOrderV2({ delivery: build({ [key]: value }) }));
+          out.push(buildOrder({ delivery: build({ [key]: value }) }));
         }
       }
     }
 
     for (const value of HOSTILE_VALUES) {
-      out.push(
-        buildOrderV2({ cart: [{ ...buildCartItem(), quantity: value }] })
-      );
-      out.push(buildOrderV2({ cart: [value] }));
+      out.push(buildOrder({ cart: [{ ...buildCartItem(), quantity: value }] }));
+      out.push(buildOrder({ cart: [value] }));
     }
 
     return out;

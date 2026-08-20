@@ -1,4 +1,4 @@
-import type { OrderCartItem, OrderPayload, PlainDecimal } from "./payload.js";
+import type { OrderCartItem, PlainDecimal } from "./payload.js";
 
 const MAX_TELEGRAM_TEXT_LENGTH = 4096;
 const CONTACT_FIELD_LIMIT = 200;
@@ -76,7 +76,7 @@ const payloadField = (value: string, limit: number): string =>
 const generatedField = (value: string, limit: number): string =>
   escapeAndClamp(value, limit);
 
-export const collapseNewlines = (value: string): string =>
+const collapseNewlines = (value: string): string =>
   value.replaceAll(/\r\n|[\n\r\v\f\u0085\u2028\u2029]/gu, " ");
 
 export const singleLineField = (value: string, limit: number): string =>
@@ -135,18 +135,6 @@ export const totalLine = (
 export const additionalLine = (value: string): string =>
   `📄 <b>Additional Information:</b> ${payloadField(value, ADDITIONAL_LIMIT)}`;
 
-const buildHeader = (payload: OrderPayload): readonly string[] => [
-  firstNameLine(payload.first_name),
-  lastNameLine(payload.last_name),
-  telephoneLine(payload.telephone),
-  countryLine(payload.country),
-  stateLine(payload.state),
-  cityLine(payload.city),
-  addressLine(payload.address),
-  totalLine(payload.total, payload.locale, payload.currency),
-  additionalLine(payload.additional),
-];
-
 const buildItem = (item: OrderCartItem): string =>
   [
     `🏷️ <b>Title:</b> ${singleLineField(item.title, CART_TITLE_LIMIT)}`,
@@ -200,6 +188,3 @@ export const composeMessage = (
     ? header + marker
     : `${header}${body}${ITEM_SEPARATOR}${marker}`;
 };
-
-export const buildOrderMessage = (payload: OrderPayload): string =>
-  composeMessage(buildHeader(payload), payload.cart);

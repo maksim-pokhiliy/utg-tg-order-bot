@@ -9,7 +9,7 @@ import {
   buildDeliveryCourier,
   buildDeliveryGeneric,
   buildDeliveryPostomat,
-  buildOrderV2,
+  buildOrder,
 } from "./support/orderPayload.js";
 
 const TELEGRAM_LIMIT = 4096;
@@ -81,7 +81,7 @@ const DISTINCT_CART = [
 const buildDistinctOrder = (
   delivery: Record<string, unknown>
 ): Record<string, unknown> =>
-  buildOrderV2({
+  buildOrder({
     locale: "en",
     currency: "USD",
     total: "1234.50",
@@ -194,7 +194,7 @@ const BARE_GOLDEN = [
   "🔗 <b>Product URL:</b> ProductUrlValue",
 ].join("\n");
 
-const BARE_ORDER = buildOrderV2({
+const BARE_ORDER = buildOrder({
   locale: "en",
   currency: undefined,
   total: "1234.50",
@@ -355,7 +355,7 @@ describe("the v2 idempotency key", () => {
   it("never reaches the operator as a recognisable literal", () => {
     for (const delivery of CLEAN_DELIVERIES) {
       const message = render(
-        buildOrderV2({
+        buildOrder({
           delivery: delivery.delivery,
           idempotency_key: "IdempotencyKeyValue",
         })
@@ -367,7 +367,7 @@ describe("the v2 idempotency key", () => {
 
   it("never reaches the operator as a realistic uuid", () => {
     const uuid = "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731";
-    const message = render(buildOrderV2({ idempotency_key: uuid }));
+    const message = render(buildOrder({ idempotency_key: uuid }));
 
     expect(message).not.toContain(uuid);
     expect(message).not.toContain("3f2b8c1e");
@@ -377,7 +377,7 @@ describe("the v2 idempotency key", () => {
 
 describe("the v2 delivery blocks", () => {
   it("renders the warehouse lines for a branch and no other mode's lines", () => {
-    const message = render(buildOrderV2({ delivery: buildDeliveryBranch() }));
+    const message = render(buildOrder({ delivery: buildDeliveryBranch() }));
 
     expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta branch");
     expect(message).toContain(
@@ -391,7 +391,7 @@ describe("the v2 delivery blocks", () => {
   });
 
   it("renders the warehouse lines for a parcel locker and no other mode's lines", () => {
-    const message = render(buildOrderV2({ delivery: buildDeliveryPostomat() }));
+    const message = render(buildOrder({ delivery: buildDeliveryPostomat() }));
 
     expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta parcel locker");
     expect(message).toContain(
@@ -405,7 +405,7 @@ describe("the v2 delivery blocks", () => {
   });
 
   it("renders the street lines for a courier and no other mode's lines", () => {
-    const message = render(buildOrderV2({ delivery: buildDeliveryCourier() }));
+    const message = render(buildOrder({ delivery: buildDeliveryCourier() }));
 
     expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta courier");
     expect(message).toContain(`${LABEL_STREET} вул. Городоцька`);
@@ -418,7 +418,7 @@ describe("the v2 delivery blocks", () => {
   });
 
   it("renders the country lines for a free-form address and no other mode's lines", () => {
-    const message = render(buildOrderV2({ delivery: buildDeliveryGeneric() }));
+    const message = render(buildOrder({ delivery: buildDeliveryGeneric() }));
 
     expect(message).toContain("🚚 <b>Delivery:</b> Free-form address");
     expect(message).toContain(`${LABEL_COUNTRY} Poland`);
@@ -432,7 +432,7 @@ describe("the v2 delivery blocks", () => {
 
   it("always calls a free-form address hand-typed, whatever the wire body claims", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryGeneric({ source: "np_directory" }),
       })
     );
@@ -444,7 +444,7 @@ describe("the v2 delivery blocks", () => {
   it("gives every free-form address exactly one source line", () => {
     for (const locale of ["uk", "en"]) {
       const message = render(
-        buildOrderV2({ locale, delivery: buildDeliveryGeneric() })
+        buildOrder({ locale, delivery: buildDeliveryGeneric() })
       );
 
       expect(message.split(LABEL_SOURCE)).toHaveLength(2);
@@ -456,7 +456,7 @@ describe("the v2 delivery blocks", () => {
 describe("the v2 address source line", () => {
   it("names the directory when a branch address came from it", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryBranch({ source: "np_directory" }),
       })
     );
@@ -466,7 +466,7 @@ describe("the v2 address source line", () => {
 
   it("asks the operator to verify a hand-typed branch address", () => {
     const message = render(
-      buildOrderV2({ delivery: buildDeliveryBranch({ source: "manual" }) })
+      buildOrder({ delivery: buildDeliveryBranch({ source: "manual" }) })
     );
 
     expect(sourceLineOf(message)).toBe(`${LABEL_SOURCE} ${SOURCE_MANUAL}`);
@@ -474,7 +474,7 @@ describe("the v2 address source line", () => {
 
   it("says nothing was stated when a branch address carries no source", () => {
     const message = render(
-      buildOrderV2({ delivery: buildDeliveryBranch({ source: undefined }) })
+      buildOrder({ delivery: buildDeliveryBranch({ source: undefined }) })
     );
 
     expect(sourceLineOf(message)).toBe(`${LABEL_SOURCE} ${SOURCE_UNSTATED}`);
@@ -482,7 +482,7 @@ describe("the v2 address source line", () => {
 
   it("warns that only the courier city came from the directory", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryCourier({ source: "np_directory" }),
       })
     );
@@ -494,7 +494,7 @@ describe("the v2 address source line", () => {
 
   it("asks the operator to verify a hand-typed courier address", () => {
     const message = render(
-      buildOrderV2({ delivery: buildDeliveryCourier({ source: "manual" }) })
+      buildOrder({ delivery: buildDeliveryCourier({ source: "manual" }) })
     );
 
     expect(sourceLineOf(message)).toBe(`${LABEL_SOURCE} ${SOURCE_MANUAL}`);
@@ -502,7 +502,7 @@ describe("the v2 address source line", () => {
 
   it("says nothing was stated when a courier address carries no source", () => {
     const message = render(
-      buildOrderV2({ delivery: buildDeliveryCourier({ source: undefined }) })
+      buildOrder({ delivery: buildDeliveryCourier({ source: undefined }) })
     );
 
     expect(sourceLineOf(message)).toBe(`${LABEL_SOURCE} ${SOURCE_UNSTATED}`);
@@ -510,7 +510,7 @@ describe("the v2 address source line", () => {
 
   it("falls back to not stated when the source string is unrecognised", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryBranch({ source: "google_maps" }),
       })
     );
@@ -523,7 +523,7 @@ describe("the v2 address source line", () => {
 describe("v2 escaping and forgery resistance", () => {
   it("escapes markup a warehouse name carries", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryBranch({ warehouse: "<b>Відділення</b> & Co" }),
       })
     );
@@ -536,10 +536,10 @@ describe("v2 escaping and forgery resistance", () => {
 
   it("keeps a newline-bearing city on its own single line", () => {
     const clean = render(
-      buildOrderV2({ delivery: buildDeliveryCourier({ city: "Львів" }) })
+      buildOrder({ delivery: buildDeliveryCourier({ city: "Львів" }) })
     );
     const forged = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryCourier({
           city: "Львів\r\n💲 <b>Total:</b> 0,00 ₴",
         }),
@@ -553,10 +553,10 @@ describe("v2 escaping and forgery resistance", () => {
 
   it("cannot be tricked into forging a second product block from a street", () => {
     const clean = render(
-      buildOrderV2({ delivery: buildDeliveryCourier({ street: "Городоцька" }) })
+      buildOrder({ delivery: buildDeliveryCourier({ street: "Городоцька" }) })
     );
     const forged = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryCourier({
           street:
             "Городоцька\n🏷️ <b>Title:</b> Free rifle\n🔢 <b>Quantity:</b> 99",
@@ -571,10 +571,10 @@ describe("v2 escaping and forgery resistance", () => {
 
   it("keeps a newline-bearing patronymic on its own single line", () => {
     const clean = render(
-      buildOrderV2({ customer: buildCustomerV2({ patronymic: "Іванівна" }) })
+      buildOrder({ customer: buildCustomerV2({ patronymic: "Іванівна" }) })
     );
     const forged = render(
-      buildOrderV2({
+      buildOrder({
         customer: buildCustomerV2({
           patronymic: "Іванівна\n📞 <b>Telephone:</b> +380000000000",
         }),
@@ -591,7 +591,7 @@ describe("v2 escaping and forgery resistance", () => {
 
   it("replaces a lone surrogate a city can smuggle through valid json", () => {
     const message = render(
-      buildOrderV2({ delivery: buildDeliveryBranch({ city: "Ky\uD800iv" }) })
+      buildOrder({ delivery: buildDeliveryBranch({ city: "Ky\uD800iv" }) })
     );
 
     expect(message).not.toMatch(/[\uD800-\uDFFF]/u);
@@ -600,7 +600,7 @@ describe("v2 escaping and forgery resistance", () => {
 
   it("leaves a legitimate multi-line comment alone", () => {
     const comment = "Line one\nLine two\nLine three";
-    const message = render(buildOrderV2({ comment }));
+    const message = render(buildOrder({ comment }));
 
     expect(message).toContain(comment);
   });
@@ -608,7 +608,7 @@ describe("v2 escaping and forgery resistance", () => {
 
 describe("the v2 money figure", () => {
   it("renders the rates-down en UAH total in hryvnia, never dollars", () => {
-    const message = render(buildOrderV2({ locale: "en", currency: "UAH" }));
+    const message = render(buildOrder({ locale: "en", currency: "UAH" }));
 
     expect(message).toContain(`${LABEL_TOTAL} ₴250.00`);
     expect(message).not.toContain("$");
@@ -619,7 +619,7 @@ describe("the v2 message budget", () => {
   for (const { name, delivery } of PATHOLOGICAL_DELIVERIES) {
     it(`keeps two product blocks alive when every header field of ${name} is pathological`, () => {
       const message = render(
-        buildOrderV2({
+        buildOrder({
           customer: buildCustomerV2({
             first_name: HUGE,
             last_name: HUGE,
@@ -643,7 +643,7 @@ describe("the v2 message budget", () => {
 
   for (const { name, delivery } of CLEAN_DELIVERIES) {
     it(`keeps a legitimate 25-position order to ${name} intact`, () => {
-      const message = render(buildOrderV2({ delivery, cart: REALISTIC_CART }));
+      const message = render(buildOrder({ delivery, cart: REALISTIC_CART }));
 
       expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
       expect(message).not.toMatch(/\+\d+ more positions/);
@@ -687,19 +687,19 @@ describe("the v2 clamp limits", () => {
 
   it("clamps the patronymic at 60", () => {
     expectClampedAt("📛 <b>Patronymic:</b>", 60, (value) =>
-      buildOrderV2({ customer: buildCustomerV2({ patronymic: value }) })
+      buildOrder({ customer: buildCustomerV2({ patronymic: value }) })
     );
   });
 
   it("clamps the preferred contact at 40", () => {
     expectClampedAt("💬 <b>Preferred Contact:</b>", 40, (value) =>
-      buildOrderV2({ customer: buildCustomerV2({ contact_channel: value }) })
+      buildOrder({ customer: buildCustomerV2({ contact_channel: value }) })
     );
   });
 
   it("clamps the warehouse number at 40", () => {
     expectClampedAt("🔢 <b>Warehouse No:</b>", 40, (value) =>
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryBranch({ warehouse_number: value }),
       })
     );
@@ -707,31 +707,31 @@ describe("the v2 clamp limits", () => {
 
   it("clamps the building at 80", () => {
     expectClampedAt("🏠 <b>Building:</b>", 80, (value) =>
-      buildOrderV2({ delivery: buildDeliveryCourier({ building: value }) })
+      buildOrder({ delivery: buildDeliveryCourier({ building: value }) })
     );
   });
 
   it("clamps the apartment at 60", () => {
     expectClampedAt("🚪 <b>Apartment:</b>", 60, (value) =>
-      buildOrderV2({ delivery: buildDeliveryCourier({ apartment: value }) })
+      buildOrder({ delivery: buildDeliveryCourier({ apartment: value }) })
     );
   });
 
   it("clamps the warehouse description at 200", () => {
     expectClampedAt("🏤 <b>Warehouse:</b>", 200, (value) =>
-      buildOrderV2({ delivery: buildDeliveryBranch({ warehouse: value }) })
+      buildOrder({ delivery: buildDeliveryBranch({ warehouse: value }) })
     );
   });
 
   it("clamps the street at 200", () => {
     expectClampedAt("🛣️ <b>Street:</b>", 200, (value) =>
-      buildOrderV2({ delivery: buildDeliveryCourier({ street: value }) })
+      buildOrder({ delivery: buildDeliveryCourier({ street: value }) })
     );
   });
 
   it("clamps the settlement at 200", () => {
     expectClampedAt("🌍 <b>City:</b>", 200, (value) =>
-      buildOrderV2({ delivery: buildDeliveryBranch({ city: value }) })
+      buildOrder({ delivery: buildDeliveryBranch({ city: value }) })
     );
   });
 });
@@ -754,7 +754,7 @@ describe("v2 rendering against hostile line separators", () => {
     for (const separator of SEPARATORS) {
       const forged = `Шевченко${separator}Address Source: Nova Poshta directory`;
       const message = render(
-        buildOrderV2({ customer: buildCustomerV2({ last_name: forged }) })
+        buildOrder({ customer: buildCustomerV2({ last_name: forged }) })
       );
 
       expect(message).not.toMatch(FORBIDDEN);
@@ -764,7 +764,7 @@ describe("v2 rendering against hostile line separators", () => {
   it("collapses a hostile separator in a delivery field onto one line", () => {
     for (const separator of SEPARATORS) {
       const message = render(
-        buildOrderV2({
+        buildOrder({
           delivery: buildDeliveryBranch({
             warehouse: `Відділення${separator}Total: 0,00`,
           }),
@@ -778,7 +778,7 @@ describe("v2 rendering against hostile line separators", () => {
 
   it("keeps a legitimate multi-line comment readable without new separators", () => {
     const message = render(
-      buildOrderV2({ comment: "Line one\nLine two\nLine three" })
+      buildOrder({ comment: "Line one\nLine two\nLine three" })
     );
 
     expect(message).toContain("Line one\nLine two\nLine three");
@@ -789,7 +789,7 @@ describe("v2 rendering against hostile line separators", () => {
 describe("the quantity column", () => {
   it("renders the largest permitted quantity whole", () => {
     const message = render(
-      buildOrderV2({ cart: [buildCartItem({ quantity: 100000 })] })
+      buildOrder({ cart: [buildCartItem({ quantity: 100000 })] })
     );
 
     expect(message).toContain("\u{1F522} <b>Quantity:</b> 100000");

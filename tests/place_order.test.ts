@@ -6,8 +6,8 @@ import {
   BrokenBodyRequest,
   buildDeliveryCourier,
   buildDeliveryGeneric,
+  buildCartItem,
   buildOrder,
-  buildOrderV2,
   CHAT_ID,
   JsonBodyRequest,
   StubRequest,
@@ -49,23 +49,12 @@ describe("POST /api/place_order", () => {
     expect(sent.url).toBe(TELEGRAM_URL);
     expect(sent.chatId).toBe(CHAT_ID);
     expect(sent.parseMode).toBe("HTML");
-    expect(sent.text).toContain("👤 <b>First Name:</b> Олександр");
-  });
-
-  it("sends the rates-down order with a hryvnia total and no dollar sign", async () => {
-    const fetchStub = stubTelegram();
-
-    await POST(new StubRequest(buildOrder({ locale: "en", currency: "UAH" })));
-
-    const sent = readSentMessage(fetchStub);
-
-    expect(sent.text).toContain("💲 <b>Total:</b> ₴46,200.00");
-    expect(sent.text).not.toContain("$");
+    expect(sent.text).toContain("👤 <b>First Name:</b> Марія");
   });
 
   it("answers 400 with the frozen error body and never echoes the input", async () => {
     const fetchStub = stubTelegram();
-    const order = buildOrder({ cart: [], first_name: "Олександр" });
+    const order = buildOrder({ cart: [] });
 
     const response = await POST(new StubRequest(order));
 
@@ -74,7 +63,7 @@ describe("POST /api/place_order", () => {
     const body = await response.text();
 
     expect(body).toBe(JSON.stringify({ status: "error" }));
-    expect(body).not.toContain("Олександр");
+    expect(body).not.toContain("Шевченко");
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
@@ -143,9 +132,9 @@ describe("POST /api/place_order", () => {
     expect(logged).toContain("errorCode");
     expect(logged).not.toContain("description");
     expect(logged).not.toContain("parse entities");
-    expect(logged).not.toContain("Олександр");
+    expect(logged).not.toContain("Марія");
     expect(logged).not.toContain("+380671234567");
-    expect(logged).not.toContain("вул. Шевченка");
+    expect(logged).not.toContain("Городоцька");
   });
 
   it("never writes the bot token or the telegram origin to the log", async () => {
@@ -185,7 +174,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
   it("relays a v2 order and answers 200 with the frozen success body", async () => {
     const fetchStub = stubTelegram();
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(200);
     await expect(readJson(response)).resolves.toEqual({ status: "success" });
@@ -202,7 +191,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
   it("parses a genuinely serialised v2 body off the wire", async () => {
     const fetchStub = stubTelegram();
 
-    const response = await POST(new JsonBodyRequest(buildOrderV2()));
+    const response = await POST(new JsonBodyRequest(buildOrder()));
 
     expect(response.status).toBe(200);
     expect(readSentMessage(fetchStub).text).toContain(
@@ -210,15 +199,28 @@ describe("POST /api/place_order with a v2 envelope", () => {
     );
   });
 
-  it("keeps serving v1 bodies unchanged while v2 is accepted", async () => {
+  it("refuses a v1-shaped body and never reaches telegram with it", async () => {
     const fetchStub = stubTelegram();
 
-    const response = await POST(new StubRequest(buildOrder()));
-
-    expect(response.status).toBe(200);
-    expect(readSentMessage(fetchStub).text).toContain(
-      "👤 <b>First Name:</b> Олександр"
+    const response = await POST(
+      new StubRequest({
+        first_name: "Олександр",
+        last_name: "Петренко",
+        telephone: "+380671234567",
+        country: "Україна",
+        state: "Київська область",
+        city: "Київ",
+        address: "вул. Шевченка, 12, кв. 5",
+        additional: "",
+        locale: "uk",
+        total: "46200.00",
+        currency: "UAH",
+        cart: [buildCartItem()],
+      })
     );
+
+    expect(response.status).toBe(400);
+    expect(fetchStub).not.toHaveBeenCalled();
   });
 
   it("sends a rates-down v2 order in hryvnia and never in dollars", async () => {
@@ -226,7 +228,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
 
     await POST(
       new StubRequest(
-        buildOrderV2({
+        buildOrder({
           locale: "en",
           currency: "UAH",
           delivery: buildDeliveryGeneric(),
@@ -246,7 +248,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
 
     const response = await POST(
       new StubRequest(
-        buildOrderV2({ delivery: buildDeliveryCourier({ building: "  " }) })
+        buildOrder({ delivery: buildDeliveryCourier({ building: "  " }) })
       )
     );
 
@@ -262,9 +264,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
   it("rejects an unsupported version before either decoder runs", async () => {
     const logs = captureConsoleWarn();
 
-    const response = await POST(
-      new StubRequest(buildOrderV2({ version: "2" }))
-    );
+    const response = await POST(new StubRequest(buildOrder({ version: "2" })));
 
     expect(response.status).toBe(400);
 
@@ -278,9 +278,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
     const logs = captureConsoleWarn();
     stubTelegram();
 
-    const response = await POST(
-      new StubRequest(buildOrderV2({ total: "1e3" }))
-    );
+    const response = await POST(new StubRequest(buildOrder({ total: "1e3" })));
 
     const body = await response.text();
 
@@ -306,7 +304,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
   it("never puts the idempotency key in front of an operator", async () => {
     const fetchStub = stubTelegram();
 
-    await POST(new StubRequest(buildOrderV2()));
+    await POST(new StubRequest(buildOrder()));
 
     expect(readSentMessage(fetchStub).text).not.toContain(
       "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731"
@@ -320,17 +318,17 @@ describe("diagnosing a rejected order in production", () => {
 
     stubTelegram();
 
-    await POST(new StubRequest(buildOrderV2({ total: "1e3" })));
+    await POST(new StubRequest(buildOrder({ total: "1e3" })));
 
     expect(joinLoggedLines(logs)).toContain('"version":2');
   });
 
-  it("tells a versionless v2 body apart from a broken v1 one", async () => {
+  it("still names an absent version on a body that states none", async () => {
     const logs = captureConsoleWarn();
 
     stubTelegram();
 
-    const versionless = buildOrderV2();
+    const versionless = buildOrder();
 
     delete versionless["version"];
 
@@ -340,7 +338,7 @@ describe("diagnosing a rejected order in production", () => {
 
     const logged = joinLoggedLines(logs);
 
-    expect(logged).toContain("required_field_missing");
+    expect(logged).toContain("version_unsupported");
     expect(logged).toContain('"version":"absent"');
   });
 
@@ -349,7 +347,7 @@ describe("diagnosing a rejected order in production", () => {
 
     stubTelegram();
 
-    await POST(new StubRequest(buildOrderV2({ version: "2" })));
+    await POST(new StubRequest(buildOrder({ version: "2" })));
 
     const logged = joinLoggedLines(logs);
 
@@ -365,7 +363,7 @@ describe("diagnosing a rejected order in production", () => {
 
     await POST(
       new StubRequest(
-        buildOrderV2({ delivery: buildDeliveryCourier({ building: "  " }) })
+        buildOrder({ delivery: buildDeliveryCourier({ building: "  " }) })
       )
     );
 

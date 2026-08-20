@@ -1,19 +1,3 @@
-export const ORDER_PAYLOAD_KEYS = [
-  "version",
-  "first_name",
-  "last_name",
-  "telephone",
-  "country",
-  "state",
-  "city",
-  "address",
-  "additional",
-  "locale",
-  "total",
-  "currency",
-  "cart",
-] as const;
-
 export const ORDER_V2_KEYS = [
   "version",
   "idempotency_key",

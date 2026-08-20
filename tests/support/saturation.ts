@@ -5,7 +5,7 @@ import type {
   DeliveryWarehouse,
   OrderDelivery,
 } from "../../src/delivery.js";
-import type { OrderCartItem, OrderPayload } from "../../src/payload.js";
+import type { OrderCartItem } from "../../src/payload.js";
 import type { OrderCustomer, OrderPayloadV2 } from "../../src/payloadV2.js";
 
 export type Saturated<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
@@ -69,7 +69,7 @@ export const SATURATED_DELIVERIES: Readonly<
   generic: saturatedGeneric,
 };
 
-export const saturatedPayloadV2 = (
+export const saturatedPayload = (
   delivery: OrderDelivery
 ): Saturated<OrderPayloadV2> => ({
   customer: saturatedCustomer,
@@ -81,18 +81,3 @@ export const saturatedPayloadV2 = (
   currency: "UAH",
   cart: saturatedCart,
 });
-
-export const saturatedPayloadV1: Saturated<OrderPayload> = {
-  first_name: FILLER,
-  last_name: FILLER,
-  telephone: FILLER,
-  country: FILLER,
-  state: FILLER,
-  city: FILLER,
-  address: FILLER,
-  additional: FILLER,
-  locale: "uk",
-  total: "99999999999999999999",
-  currency: "UAH",
-  cart: saturatedCart,
-};

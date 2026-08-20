@@ -4,8 +4,7 @@ import { buildOmittedMarker, omittedMarkerAllowance } from "../src/message.js";
 import { renderOrder } from "../src/messageV2.js";
 import {
   SATURATED_DELIVERIES,
-  saturatedPayloadV1,
-  saturatedPayloadV2,
+  saturatedPayload,
 } from "./support/saturation.js";
 
 const TELEGRAM_LIMIT = 4096;
@@ -18,20 +17,11 @@ const blocksIn = (message: string): number =>
   message.split(TITLE_LABEL).length - 1;
 
 describe("the composed message can never exceed the telegram limit", () => {
-  it("holds for a v1 order with every field saturated with astral text", () => {
-    const message = renderOrder({ kind: "v1", payload: saturatedPayloadV1 });
-
-    expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-    expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
-    expect(message).toContain(TOTAL_LABEL);
-    expect(blocksIn(message)).toBeGreaterThanOrEqual(MIN_SURVIVING_BLOCKS);
-  });
-
   for (const [mode, delivery] of Object.entries(SATURATED_DELIVERIES)) {
     it(`holds for a v2 ${mode} order with every field saturated`, () => {
       const message = renderOrder({
         kind: "v2",
-        payload: saturatedPayloadV2(delivery),
+        payload: saturatedPayload(delivery),
       });
 
       expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
@@ -45,7 +35,7 @@ describe("the composed message can never exceed the telegram limit", () => {
     for (const delivery of Object.values(SATURATED_DELIVERIES)) {
       const message = renderOrder({
         kind: "v2",
-        payload: saturatedPayloadV2(delivery),
+        payload: saturatedPayload(delivery),
       });
 
       expect(message.toWellFormed()).toBe(message);
@@ -55,7 +45,7 @@ describe("the composed message can never exceed the telegram limit", () => {
 
   it("leaves the cart a budget that still fits the omitted marker", () => {
     for (const delivery of Object.values(SATURATED_DELIVERIES)) {
-      const payload = saturatedPayloadV2(delivery);
+      const payload = saturatedPayload(delivery);
       const header = renderOrder({
         kind: "v2",
         payload: { ...payload, cart: [] },

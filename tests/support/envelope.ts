@@ -50,29 +50,11 @@ const buildPayloadV2 = (
   ...overrides,
 });
 
-export const buildEnvelopeV2 = (
+export const buildEnvelope = (
   overrides: Partial<OrderPayloadV2> = {}
 ): OrderEnvelope => ({
   kind: "v2",
   payload: buildPayloadV2(overrides),
 });
 
-export const buildEnvelopeV1 = (): OrderEnvelope => ({
-  kind: "v1",
-  payload: {
-    first_name: "Олександр",
-    last_name: "Петренко",
-    telephone: "+380671234567",
-    country: "Україна",
-    state: "Київська область",
-    city: "Київ",
-    address: "вул. Шевченка, 12, кв. 5",
-    additional: "",
-    locale: "uk",
-    total: "46200.00",
-    currency: "UAH",
-    cart: [buildCartLine()],
-  },
-});
-
-export const PINNED_ENVELOPE: OrderEnvelope = buildEnvelopeV2();
+export const PINNED_ENVELOPE: OrderEnvelope = buildEnvelope();

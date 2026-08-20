@@ -8,11 +8,7 @@ import {
   STORE_MARK_TIMEOUT_MS,
   STORE_QUERY_TIMEOUT_MS,
 } from "../src/store.js";
-import {
-  buildEnvelopeV1,
-  buildEnvelopeV2,
-  PINNED_KEY,
-} from "./support/envelope.js";
+import { buildEnvelope, PINNED_KEY } from "./support/envelope.js";
 import {
   captureConsole,
   joinAllLogged,
@@ -50,7 +46,7 @@ afterEach(() => {
 describe("the store without configuration", () => {
   it("reports not_configured, touches the network zero times and says nothing", async () => {
     const stub = stubRelayFetch();
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await expect(recordAttempt(attempt)).resolves.toEqual({
       ok: false,
@@ -66,7 +62,7 @@ describe("the store without configuration", () => {
     const stub = stubRelayFetch();
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "not_configured" });
     expect(stub).not.toHaveBeenCalled();
   });
@@ -75,7 +71,7 @@ describe("the store without configuration", () => {
     const stub = stubRelayFetch();
 
     await expect(
-      markAttempt(createAttempt(buildEnvelopeV2()), {
+      markAttempt(createAttempt(buildEnvelope()), {
         isDelivered: true,
         messageId: 1,
       })
@@ -90,7 +86,7 @@ describe("the store request", () => {
   it("posts the statement to the /sql endpoint of the configured host", async () => {
     const stub = stubRelayFetch();
 
-    await recordAttempt(createAttempt(buildEnvelopeV2()));
+    await recordAttempt(createAttempt(buildEnvelope()));
 
     const [call] = readNeonCalls(stub);
 
@@ -101,7 +97,7 @@ describe("the store request", () => {
 
   it("boxes both statements in an abort signal", async () => {
     const stub = stubRelayFetch({ neon: async () => neonMarkOk() });
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await recordAttempt(attempt);
     await markAttempt(attempt, { isDelivered: true, messageId: 1 });
@@ -121,14 +117,14 @@ describe("the store request", () => {
   it("refuses to follow a redirect, so the connection string cannot be forwarded", async () => {
     const stub = stubRelayFetch();
 
-    await recordAttempt(createAttempt(buildEnvelopeV2()));
+    await recordAttempt(createAttempt(buildEnvelope()));
 
     expect(readNeonCalls(stub)[0]?.redirect).toBe("error");
   });
 
   it("carries the v2 key, schema version and the verbatim envelope as params", async () => {
     const stub = stubRelayFetch();
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await recordAttempt(attempt);
 
@@ -143,7 +139,7 @@ describe("the store request", () => {
 
   it("stores the idempotency key inside the payload even though the hash excludes it", async () => {
     const stub = stubRelayFetch();
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await recordAttempt(attempt);
 
@@ -152,7 +148,7 @@ describe("the store request", () => {
 
   it("binds exactly as many params as the statement has placeholders", async () => {
     const stub = stubRelayFetch({ neon: async () => neonMarkOk() });
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await recordAttempt(attempt);
     await markAttempt(attempt, { isDelivered: true, messageId: 1 });
@@ -169,15 +165,28 @@ describe("the store request", () => {
     }
   });
 
-  it("sends a null key and schema version 1 for a v1 order", async () => {
+  it("sends a null key for a keyless order and stamps schema version 2", async () => {
     const stub = stubRelayFetch();
 
-    await recordAttempt(createAttempt(buildEnvelopeV1()));
+    await recordAttempt(
+      createAttempt(buildEnvelope({ idempotency_key: undefined }))
+    );
 
     const [call] = readNeonCalls(stub);
 
     expect(call?.params[1]).toBeNull();
-    expect(call?.params[3]).toBe(1);
+    expect(call?.params[3]).toBe(2);
+  });
+
+  it("stamps schema version 2 on an order that does carry a key", async () => {
+    const stub = stubRelayFetch();
+
+    await recordAttempt(createAttempt(buildEnvelope()));
+
+    const [call] = readNeonCalls(stub);
+
+    expect(call?.params[1]).toBe(PINNED_KEY);
+    expect(call?.params[3]).toBe(2);
   });
 });
 
@@ -188,7 +197,7 @@ describe("the store response", () => {
     stubRelayFetch({ neon: async () => neonFresh("12") });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: true, value: { rowId: "12", prior: undefined } });
   });
 
@@ -203,7 +212,7 @@ describe("the store response", () => {
         }),
     });
 
-    const result = await recordAttempt(createAttempt(buildEnvelopeV2()));
+    const result = await recordAttempt(createAttempt(buildEnvelope()));
 
     expect(result).toEqual({
       ok: true,
@@ -230,7 +239,7 @@ describe("the store response", () => {
     stubRelayFetch({ neon: async () => neonMarkOk() });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: true, value: { rowId: null, prior: undefined } });
 
     expect(joinAllLogged(logs)).toContain("order_stored");
@@ -241,7 +250,7 @@ describe("the store response", () => {
       neon: async () => neonDuplicate({ dupeOf: "6", contentHash: null }),
     });
 
-    const result = await recordAttempt(createAttempt(buildEnvelopeV2()));
+    const result = await recordAttempt(createAttempt(buildEnvelope()));
 
     expect(result).toEqual({
       ok: true,
@@ -255,7 +264,7 @@ describe("the store response", () => {
     const huge = "я".repeat(MAX_PAYLOAD_CHARS);
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2({ comment: huge })))
+      recordAttempt(createAttempt(buildEnvelope({ comment: huge })))
     ).resolves.toEqual({ ok: false, reason: "payload_too_large" });
 
     expect(stub).not.toHaveBeenCalled();
@@ -273,7 +282,7 @@ describe("the store response", () => {
     });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "response_unreadable" });
   });
 
@@ -281,7 +290,7 @@ describe("the store response", () => {
     stubRelayFetch({ neon: async () => new Response("<html>502</html>") });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "response_unreadable" });
   });
 });
@@ -293,7 +302,7 @@ describe("the store failure classification", () => {
     stubRelayFetch({ neon: async () => neonError("missing-table") });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "upstream_rejected" });
 
     const logged = joinAllLogged(logs);
@@ -309,7 +318,7 @@ describe("the store failure classification", () => {
     stubRelayFetch({ neon: async () => neonError("auth") });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "upstream_rejected" });
     expect(joinAllLogged(logs)).not.toContain("password authentication failed");
   });
@@ -318,7 +327,7 @@ describe("the store failure classification", () => {
     stubRelayFetch({ neon: async () => neonError("syntax") });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "upstream_rejected" });
     expect(joinAllLogged(logs)).not.toContain("syntax error");
   });
@@ -331,7 +340,7 @@ describe("the store failure classification", () => {
     });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "timeout" });
     expect(joinAllLogged(logs)).toContain(String(STORE_QUERY_TIMEOUT_MS));
   });
@@ -344,7 +353,7 @@ describe("the store failure classification", () => {
     });
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "network_error" });
     expect(joinAllLogged(logs)).toContain("network_error");
   });
@@ -361,7 +370,7 @@ describe("the store failure classification", () => {
       const stub = stubRelayFetch();
 
       await expect(
-        recordAttempt(createAttempt(buildEnvelopeV2()))
+        recordAttempt(createAttempt(buildEnvelope()))
       ).resolves.toEqual({ ok: false, reason: "bad_config" });
 
       expect({ hostile, calls: stub.mock.calls.length }).toEqual({
@@ -380,7 +389,7 @@ describe("the store failure classification", () => {
     );
     const stub = stubRelayFetch();
 
-    await recordAttempt(createAttempt(buildEnvelopeV2()));
+    await recordAttempt(createAttempt(buildEnvelope()));
 
     expect(readNeonCalls(stub)[0]?.url).toBe(
       "https://ep-cool-darkness-123456-pooler.us-east-2.aws.neon.tech/sql"
@@ -392,7 +401,7 @@ describe("the store failure classification", () => {
     const stub = stubRelayFetch();
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "bad_config" });
 
     expect(stub).not.toHaveBeenCalled();
@@ -411,7 +420,7 @@ describe("the store failure classification", () => {
         ),
     });
 
-    await recordAttempt(createAttempt(buildEnvelopeV2()));
+    await recordAttempt(createAttempt(buildEnvelope()));
 
     const logged = joinAllLogged(logs);
 
@@ -425,7 +434,7 @@ describe("the store failure classification", () => {
     const stub = stubRelayFetch();
 
     await expect(
-      recordAttempt(createAttempt(buildEnvelopeV2()))
+      recordAttempt(createAttempt(buildEnvelope()))
     ).resolves.toEqual({ ok: false, reason: "bad_config" });
 
     expect(stub).not.toHaveBeenCalled();
@@ -442,7 +451,7 @@ describe("the post-send mark", () => {
 
   it("upserts the delivered outcome with the telegram message id", async () => {
     const stub = stubRelayFetch({ neon: async () => neonMarkOk() });
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await expect(
       markAttempt(attempt, { isDelivered: true, messageId: 4242 })
@@ -463,7 +472,7 @@ describe("the post-send mark", () => {
   it("records a named send failure and no message id when delivery failed", async () => {
     const stub = stubRelayFetch({ neon: async () => neonMarkOk() });
 
-    await markAttempt(createAttempt(buildEnvelopeV2()), {
+    await markAttempt(createAttempt(buildEnvelope()), {
       isDelivered: false,
       failure: "ack_unreadable",
     });
@@ -477,7 +486,7 @@ describe("the post-send mark", () => {
 
   it("carries the whole row so a recovered database can write it late", async () => {
     const stub = stubRelayFetch({ neon: async () => neonMarkOk() });
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await markAttempt(attempt, { isDelivered: true, messageId: undefined });
 
@@ -494,7 +503,7 @@ describe("the post-send mark", () => {
     const huge = "я".repeat(MAX_PAYLOAD_CHARS);
 
     await expect(
-      markAttempt(createAttempt(buildEnvelopeV2({ comment: huge })), {
+      markAttempt(createAttempt(buildEnvelope({ comment: huge })), {
         isDelivered: true,
         messageId: 1,
       })
@@ -509,7 +518,7 @@ describe("the post-send mark", () => {
     stubRelayFetch({ neon: async () => neonError("missing-table") });
 
     await expect(
-      markAttempt(createAttempt(buildEnvelopeV2()), {
+      markAttempt(createAttempt(buildEnvelope()), {
         isDelivered: true,
         messageId: 1,
       })
@@ -524,7 +533,7 @@ describe("the post-send mark", () => {
       },
     });
 
-    await markAttempt(createAttempt(buildEnvelopeV2()), {
+    await markAttempt(createAttempt(buildEnvelope()), {
       isDelivered: true,
       messageId: 1,
     });
@@ -540,7 +549,7 @@ describe("what the store is never allowed to log", () => {
   it("keeps the connection string, its password and its host out of every line", async () => {
     stubRelayFetch({ neon: async () => neonError("auth") });
 
-    await recordAttempt(createAttempt(buildEnvelopeV2()));
+    await recordAttempt(createAttempt(buildEnvelope()));
 
     const logged = joinAllLogged(logs);
 
@@ -551,7 +560,7 @@ describe("what the store is never allowed to log", () => {
 
   it("keeps every buyer value and the full key and hash out of every line", async () => {
     stubRelayFetch({ neon: async () => neonError("missing-table") });
-    const attempt = createAttempt(buildEnvelopeV2());
+    const attempt = createAttempt(buildEnvelope());
 
     await recordAttempt(attempt);
 

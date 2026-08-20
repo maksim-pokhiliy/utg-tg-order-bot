@@ -7,7 +7,6 @@ import {
   BOT_TOKEN,
   buildCartItem,
   buildOrder,
-  buildOrderV2,
   CHAT_ID,
   StubRequest,
   TELEGRAM_URL,
@@ -78,7 +77,7 @@ describe("the relay with no store configured", () => {
     vi.stubEnv("DATABASE_URL", "");
     const stub = stubRelayFetch();
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(stub).toHaveBeenCalledTimes(1);
     expect(readTelegramCall(stub).url).toBe(TELEGRAM_URL);
@@ -92,9 +91,7 @@ describe("the relay with no store configured", () => {
     const stub = stubRelayFetch();
     const huge = "я".repeat(300_000);
 
-    const response = await POST(
-      new StubRequest(buildOrderV2({ comment: huge }))
-    );
+    const response = await POST(new StubRequest(buildOrder({ comment: huge })));
 
     expect(response.status).toBe(200);
     expect(stub).toHaveBeenCalledTimes(1);
@@ -106,7 +103,7 @@ describe("the relay with no store configured", () => {
     vi.stubEnv("DATABASE_URL", "  \n ");
     const stub = stubRelayFetch();
 
-    await POST(new StubRequest(buildOrderV2()));
+    await POST(new StubRequest(buildOrder()));
 
     expect(stub).toHaveBeenCalledTimes(1);
   });
@@ -123,7 +120,7 @@ describe("the relay with a store", () => {
       telegram: async () => telegramOk(4242),
     });
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toBe(FROZEN_SUCCESS);
@@ -150,7 +147,7 @@ describe("the relay with a store", () => {
         ),
     });
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(200);
     expect(readNeonCalls(stub)[1]?.params[6]).toBeNull();
@@ -161,7 +158,7 @@ describe("the relay with a store", () => {
       neon: async (call) => (call === 1 ? neonFresh() : neonMarkOk()),
     });
 
-    await POST(new StubRequest(buildOrderV2()));
+    await POST(new StubRequest(buildOrder()));
 
     const telegramCall = stub.mock.calls.find(([input]) =>
       String(input).includes("api.telegram.org")
@@ -179,7 +176,7 @@ describe("the relay with a store", () => {
         }),
     });
 
-    const response = await POST(new StubRequest(buildOrderV2()));
+    const response = await POST(new StubRequest(buildOrder()));
 
     expect(response.status).toBe(500);
 
@@ -190,7 +187,7 @@ describe("the relay with a store", () => {
   });
 
   it("answers the byte-identical frozen success body on the suppressed path", async () => {
-    const body = buildOrderV2();
+    const body = buildOrder();
     const stub = stubRelayFetch({ neon: async () => deliveredPrior(body) });
 
     const response = await POST(new StubRequest(body));
@@ -204,7 +201,7 @@ describe("the relay with a store", () => {
   });
 
   it("suppresses a byte-identical retry of a delivered order", async () => {
-    const body = buildOrderV2();
+    const body = buildOrder();
     const stub = stubRelayFetch({ neon: async () => deliveredPrior(body) });
 
     await POST(new StubRequest(body));
@@ -213,11 +210,11 @@ describe("the relay with a store", () => {
   });
 
   it("delivers an edited order that reuses the idempotency key of a delivered one", async () => {
-    const original = buildOrderV2({
+    const original = buildOrder({
       total: "1300.00",
       cart: [buildCartItem(), buildCartItem({ title: "Другий шеврон" })],
     });
-    const edited = buildOrderV2({
+    const edited = buildOrder({
       total: "300.00",
       cart: [buildCartItem()],
     });
@@ -239,7 +236,7 @@ describe("the relay with a store", () => {
   });
 
   it("sends again after an ambiguous outcome left the prior unconfirmed", async () => {
-    const body = buildOrderV2();
+    const body = buildOrder();
     const stub = stubRelayFetch({
       neon: async (call) =>
         call === 1 ? deliveredPrior(body, { sentAt: null }) : neonMarkOk(),
@@ -255,13 +252,13 @@ describe("the relay with a store", () => {
       neon: async (call) => (call === 1 ? neonFresh() : neonMarkOk()),
     });
 
-    await POST(new StubRequest(buildOrderV2()));
+    await POST(new StubRequest(buildOrder()));
 
     expect(readTelegramCalls(stub)).toHaveLength(1);
   });
 
   it("sends a retry whose prior is older than the dedupe window", async () => {
-    const body = buildOrderV2();
+    const body = buildOrder();
     const stub = stubRelayFetch({
       neon: async (call) =>
         call === 1 ? deliveredPrior(body, { ageSeconds: 1801 }) : neonMarkOk(),
@@ -272,8 +269,11 @@ describe("the relay with a store", () => {
     expect(readTelegramCalls(stub)).toHaveLength(1);
   });
 
-  it("stores a v1 order and never suppresses it, even when the statement offers a prior", async () => {
+  it("stores a keyless order and never suppresses it, even when the statement offers a prior", async () => {
     const body = buildOrder();
+
+    delete body["idempotency_key"];
+
     const stub = stubRelayFetch({
       neon: async (call) =>
         call % 2 === 1
@@ -294,7 +294,7 @@ describe("the relay with a store", () => {
     expect(second.status).toBe(200);
     expect(readTelegramCalls(stub)).toHaveLength(2);
     expect(readNeonCalls(stub)[0]?.params[1]).toBeNull();
-    expect(readNeonCalls(stub)[0]?.params[3]).toBe(1);
+    expect(readNeonCalls(stub)[0]?.params[3]).toBe(2);
     expect(joinAllLogged(logs)).not.toContain("order_deduplicated");
   });
 });
@@ -305,7 +305,7 @@ describe("what the relay logs about the store", () => {
   });
 
   it("never writes a payload value, the connection string, the full key or the neon message to a log", async () => {
-    const body = buildOrderV2();
+    const body = buildOrder();
     const stub = stubRelayFetch({
       neon: async (call) =>
         call === 1 ? neonError("auth") : neonError("missing-table"),
@@ -341,7 +341,7 @@ describe("what the relay logs about the store", () => {
   });
 
   it("logs only a short prefix of the hash and of the key", async () => {
-    const body = buildOrderV2();
+    const body = buildOrder();
 
     stubRelayFetch({
       neon: async (call) => (call === 1 ? deliveredPrior(body) : neonMarkOk()),
