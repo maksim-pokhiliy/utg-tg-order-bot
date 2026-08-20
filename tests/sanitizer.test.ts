@@ -231,17 +231,52 @@ describe("the characters that were lying to the operator", () => {
     expect(message).not.toContain("<b>Bobby</b>");
   });
 
-  for (const [raw, escaped] of NORMALIZES_TO_MARKUP) {
-    it(`escapes ${JSON.stringify(raw)}, which normalization turns into markup`, () => {
-      const message = render(
-        buildOrder({ customer: buildCustomer({ first_name: `A${raw}B` }) })
-      );
+  const MARKUP_CARRIERS: readonly FieldProbe[] = [
+    {
+      name: "customer.first_name",
+      build: (value) =>
+        buildOrder({ customer: buildCustomer({ first_name: value }) }),
+    },
+    { name: "comment", build: (value) => buildOrder({ comment: value }) },
+  ];
 
-      expect(lineOf(message, "👤 <b>First Name:</b>")).toBe(
-        `👤 <b>First Name:</b> A${escaped}B`
-      );
-    });
+  const LABEL_OF: Readonly<Record<string, string>> = {
+    "customer.first_name": "👤 <b>First Name:</b>",
+    comment: ADDITIONAL_LABEL,
+  };
+
+  for (const carrier of MARKUP_CARRIERS) {
+    for (const [raw, escaped] of NORMALIZES_TO_MARKUP) {
+      it(`escapes ${JSON.stringify(raw)} out of ${carrier.name}, which normalization turns into markup`, () => {
+        const label = LABEL_OF[carrier.name] ?? "";
+        const message = render(carrier.build(`A${raw}B`));
+
+        expect(lineOf(message, label)).toBe(`${label} A${escaped}B`);
+      });
+    }
   }
+
+  it("cannot be talked into a live anchor by a fullwidth comment", () => {
+    const message = render(
+      buildOrder({ comment: "＜a href=＂https://evil.test＂＞click＜/a＞" })
+    );
+
+    expect(message).not.toMatch(/<a\s/u);
+    expect(lineOf(message, ADDITIONAL_LABEL)).toBe(
+      `${ADDITIONAL_LABEL} &lt;a href="https://evil.test"&gt;click&lt;/a&gt;`
+    );
+  });
+
+  it("bounds the work before NFKC can multiply it", () => {
+    const before = process.memoryUsage().heapUsed;
+    const started = Date.now();
+
+    const message = render(buildOrder({ comment: "\uFDFA".repeat(4_000_000) }));
+
+    expect(Date.now() - started).toBeLessThan(250);
+    expect(process.memoryUsage().heapUsed - before).toBeLessThan(60_000_000);
+    expect(message.length).toBeLessThanOrEqual(4096);
+  });
 
   it("bounds the work before sanitizing, not after", () => {
     const beyondTheBound = `${ZERO_WIDTH_SPACE.repeat(2000)}Kyiv`;

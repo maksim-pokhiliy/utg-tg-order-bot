@@ -855,7 +855,7 @@ describe("parseOrder shared payload rules", () => {
   });
 
   it("rejects a malformed currency code", () => {
-    for (const currency of ["UAHX", "ua", "U1H", "", 42]) {
+    for (const currency of ["UAHX", "ua", "uah", "U1H", "", 42]) {
       expectReject({ currency }, "currency_malformed");
     }
   });
@@ -1119,26 +1119,26 @@ describe("decodeEnvelopeBody", () => {
 });
 
 describe("the reject reason set", () => {
-  const DECLARED_REASONS: ReadonlySet<RejectReason> = new Set<RejectReason>([
-    "body_not_object",
-    "locale_not_string",
-    "total_not_plain_decimal",
-    "currency_malformed",
-    "cart_not_array",
-    "cart_empty",
-    "cart_item_malformed",
-    "version_unsupported",
-    "customer_not_object",
-    "customer_field_missing",
-    "delivery_not_object",
-    "delivery_mode_missing",
-    "delivery_mode_unknown",
-    "delivery_city_missing",
-    "delivery_warehouse_missing",
-    "delivery_street_missing",
-    "delivery_building_missing",
-    "delivery_address_missing",
-  ]);
+  const DECLARED_REASONS: Readonly<Record<RejectReason, true>> = {
+    body_not_object: true,
+    locale_not_string: true,
+    total_not_plain_decimal: true,
+    currency_malformed: true,
+    cart_not_array: true,
+    cart_empty: true,
+    cart_item_malformed: true,
+    version_unsupported: true,
+    customer_not_object: true,
+    customer_field_missing: true,
+    delivery_not_object: true,
+    delivery_mode_missing: true,
+    delivery_mode_unknown: true,
+    delivery_city_missing: true,
+    delivery_warehouse_missing: true,
+    delivery_street_missing: true,
+    delivery_building_missing: true,
+    delivery_address_missing: true,
+  };
 
   const HOSTILE_VALUES: readonly unknown[] = [
     undefined,
@@ -1247,7 +1247,7 @@ describe("the reject reason set", () => {
       if (!result.ok) {
         rejected += 1;
         seen.add(result.reason);
-        expect(DECLARED_REASONS.has(result.reason)).toBe(true);
+        expect(DECLARED_REASONS[result.reason]).toBe(true);
       }
     }
 
