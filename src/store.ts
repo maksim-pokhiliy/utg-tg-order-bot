@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { isStoreConfigured, runStatement, type StoreFailure } from "./neon.js";
 import { hashOrder } from "./orderHash.js";
-import type { OrderEnvelope } from "./payloadV2.js";
+import type { OrderEnvelope } from "./payload.js";
 import type { SendFailure } from "./telegram.js";
 
 export const STORE_QUERY_TIMEOUT_MS = 2_000;

@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { renderOrder } from "../src/messageV2.js";
-import { type RejectReason } from "../src/payload.js";
+import { renderOrder } from "../src/message.js";
+import { type RejectReason } from "../src/decode.js";
 import {
   parseOrder,
-  parseOrderPayloadV2,
+  parseOrderPayload,
   type OrderParseResult,
-  type OrderPayloadV2,
-} from "../src/payloadV2.js";
+  type OrderPayload,
+} from "../src/payload.js";
 import {
   buildCartItem,
-  buildCustomerV2,
+  buildCustomer,
   buildDeliveryBranch,
   buildDeliveryCourier,
   buildDeliveryGeneric,
@@ -57,7 +57,7 @@ const HOSTILE_IDEMPOTENCY_KEYS: readonly unknown[] = [
   { value: CONTRACT_IDEMPOTENCY_KEY },
 ];
 
-const payloadOf = (result: OrderParseResult): OrderPayloadV2 | undefined => {
+const payloadOf = (result: OrderParseResult): OrderPayload | undefined => {
   expect(result.ok).toBe(true);
 
   return result.ok && result.value.kind === "v2"
@@ -65,9 +65,9 @@ const payloadOf = (result: OrderParseResult): OrderPayloadV2 | undefined => {
     : undefined;
 };
 
-const decodeV2 = (
+const decode = (
   overrides: Record<string, unknown> = {}
-): OrderPayloadV2 | undefined => payloadOf(parseOrder(buildOrder(overrides)));
+): OrderPayload | undefined => payloadOf(parseOrder(buildOrder(overrides)));
 
 const expectRejectedBody = (body: unknown, reason: RejectReason): void => {
   const result = parseOrder(body);
@@ -118,7 +118,7 @@ describe("parseOrder version dispatch", () => {
     expectRejectedBody(legacyBody, "version_unsupported");
   });
 
-  it("routes version 2 to the decoder", () => {
+  it("accepts the version the shop sends", () => {
     const result = parseOrder(buildOrder());
 
     expect(result.ok).toBe(true);
@@ -128,7 +128,7 @@ describe("parseOrder version dispatch", () => {
     }
   });
 
-  it("routes version 2.0 to the v2 decoder because 2.0 is the number 2", () => {
+  it("accepts version 2.0 because 2.0 is the number 2", () => {
     expect(2.0).toBe(2);
 
     const result = parseOrder(buildOrder({ version: 2.0 }));
@@ -168,9 +168,9 @@ describe("parseOrder version dispatch", () => {
   });
 });
 
-describe("parseOrder v2 happy paths", () => {
+describe("parseOrder happy paths", () => {
   it("decodes a Nova Poshta branch order", () => {
-    const payload = decodeV2();
+    const payload = decode();
 
     expect(payload).toBeDefined();
 
@@ -199,7 +199,7 @@ describe("parseOrder v2 happy paths", () => {
   });
 
   it("decodes a postomat order", () => {
-    const payload = decodeV2({ delivery: buildDeliveryPostomat() });
+    const payload = decode({ delivery: buildDeliveryPostomat() });
 
     expect(payload).toBeDefined();
 
@@ -214,8 +214,8 @@ describe("parseOrder v2 happy paths", () => {
   });
 
   it("gives a postomat the same field set as a branch with a different mode", () => {
-    const branch = decodeV2();
-    const postomat = decodeV2({ delivery: buildDeliveryPostomat() });
+    const branch = decode();
+    const postomat = decode({ delivery: buildDeliveryPostomat() });
 
     expect(branch).toBeDefined();
     expect(postomat).toBeDefined();
@@ -229,7 +229,7 @@ describe("parseOrder v2 happy paths", () => {
   });
 
   it("decodes a courier order", () => {
-    const payload = decodeV2({ delivery: buildDeliveryCourier() });
+    const payload = decode({ delivery: buildDeliveryCourier() });
 
     expect(payload).toBeDefined();
 
@@ -247,7 +247,7 @@ describe("parseOrder v2 happy paths", () => {
   });
 
   it("decodes a generic international order", () => {
-    const payload = decodeV2({ delivery: buildDeliveryGeneric() });
+    const payload = decode({ delivery: buildDeliveryGeneric() });
 
     expect(payload).toBeDefined();
 
@@ -264,13 +264,13 @@ describe("parseOrder v2 happy paths", () => {
   });
 });
 
-describe("parseOrder v2 optional fields that are absent", () => {
+describe("parseOrder optional fields that are absent", () => {
   it("accepts a customer with no patronymic", () => {
-    const customer = buildCustomerV2();
+    const customer = buildCustomer();
 
     delete customer["patronymic"];
 
-    const payload = decodeV2({ customer });
+    const payload = decode({ customer });
 
     expect(payload).toBeDefined();
 
@@ -280,11 +280,11 @@ describe("parseOrder v2 optional fields that are absent", () => {
   });
 
   it("accepts a customer with no contact channel", () => {
-    const customer = buildCustomerV2();
+    const customer = buildCustomer();
 
     delete customer["contact_channel"];
 
-    const payload = decodeV2({ customer });
+    const payload = decode({ customer });
 
     expect(payload).toBeDefined();
 
@@ -298,7 +298,7 @@ describe("parseOrder v2 optional fields that are absent", () => {
 
     delete delivery["warehouse_number"];
 
-    const payload = decodeV2({ delivery });
+    const payload = decode({ delivery });
 
     expect(payload).toBeDefined();
 
@@ -312,7 +312,7 @@ describe("parseOrder v2 optional fields that are absent", () => {
 
     delete delivery["apartment"];
 
-    const payload = decodeV2({ delivery });
+    const payload = decode({ delivery });
 
     expect(payload).toBeDefined();
 
@@ -326,7 +326,7 @@ describe("parseOrder v2 optional fields that are absent", () => {
 
     delete delivery["state"];
 
-    const payload = decodeV2({ delivery });
+    const payload = decode({ delivery });
 
     expect(payload).toBeDefined();
 
@@ -350,10 +350,10 @@ describe("parseOrder v2 optional fields that are absent", () => {
   });
 });
 
-describe("parseOrder v2 optional fields that are null", () => {
+describe("parseOrder optional fields that are null", () => {
   it("reads a null patronymic as absent", () => {
-    const payload = decodeV2({
-      customer: buildCustomerV2({ patronymic: null }),
+    const payload = decode({
+      customer: buildCustomer({ patronymic: null }),
     });
 
     expect(payload).toBeDefined();
@@ -364,8 +364,8 @@ describe("parseOrder v2 optional fields that are null", () => {
   });
 
   it("reads a null contact channel as absent", () => {
-    const payload = decodeV2({
-      customer: buildCustomerV2({ contact_channel: null }),
+    const payload = decode({
+      customer: buildCustomer({ contact_channel: null }),
     });
 
     expect(payload).toBeDefined();
@@ -376,7 +376,7 @@ describe("parseOrder v2 optional fields that are null", () => {
   });
 
   it("reads a null warehouse number as absent", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryBranch({ warehouse_number: null }),
     });
 
@@ -388,7 +388,7 @@ describe("parseOrder v2 optional fields that are null", () => {
   });
 
   it("reads a null apartment as absent", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryCourier({ apartment: null }),
     });
 
@@ -400,7 +400,7 @@ describe("parseOrder v2 optional fields that are null", () => {
   });
 
   it("reads a null state as absent", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryGeneric({ state: null }),
     });
 
@@ -412,7 +412,7 @@ describe("parseOrder v2 optional fields that are null", () => {
   });
 
   it("reads a null comment as absent", () => {
-    const payload = decodeV2({ comment: null });
+    const payload = decode({ comment: null });
 
     expect(payload).toBeDefined();
 
@@ -422,10 +422,10 @@ describe("parseOrder v2 optional fields that are null", () => {
   });
 });
 
-describe("parseOrder v2 optional fields that are blank", () => {
+describe("parseOrder optional fields that are blank", () => {
   it("reads a blank patronymic as absent", () => {
     for (const patronymic of BLANK_TEXTS) {
-      const payload = decodeV2({ customer: buildCustomerV2({ patronymic }) });
+      const payload = decode({ customer: buildCustomer({ patronymic }) });
 
       expect(payload).toBeDefined();
 
@@ -437,8 +437,8 @@ describe("parseOrder v2 optional fields that are blank", () => {
 
   it("reads a blank contact channel as absent", () => {
     for (const contact_channel of BLANK_TEXTS) {
-      const payload = decodeV2({
-        customer: buildCustomerV2({ contact_channel }),
+      const payload = decode({
+        customer: buildCustomer({ contact_channel }),
       });
 
       expect(payload).toBeDefined();
@@ -451,7 +451,7 @@ describe("parseOrder v2 optional fields that are blank", () => {
 
   it("reads a blank warehouse number as absent", () => {
     for (const warehouse_number of BLANK_TEXTS) {
-      const payload = decodeV2({
+      const payload = decode({
         delivery: buildDeliveryBranch({ warehouse_number }),
       });
 
@@ -465,7 +465,7 @@ describe("parseOrder v2 optional fields that are blank", () => {
 
   it("reads a blank apartment as absent", () => {
     for (const apartment of BLANK_TEXTS) {
-      const payload = decodeV2({
+      const payload = decode({
         delivery: buildDeliveryCourier({ apartment }),
       });
 
@@ -479,7 +479,7 @@ describe("parseOrder v2 optional fields that are blank", () => {
 
   it("reads a blank state as absent", () => {
     for (const state of BLANK_TEXTS) {
-      const payload = decodeV2({ delivery: buildDeliveryGeneric({ state }) });
+      const payload = decode({ delivery: buildDeliveryGeneric({ state }) });
 
       expect(payload).toBeDefined();
 
@@ -491,7 +491,7 @@ describe("parseOrder v2 optional fields that are blank", () => {
 
   it("reads a blank comment as absent", () => {
     for (const comment of BLANK_TEXTS) {
-      const payload = decodeV2({ comment });
+      const payload = decode({ comment });
 
       expect(payload).toBeDefined();
 
@@ -502,9 +502,9 @@ describe("parseOrder v2 optional fields that are blank", () => {
   });
 });
 
-describe("parseOrder v2 idempotency key", () => {
+describe("parseOrder idempotency key", () => {
   it("carries the contract example key through the decode", () => {
-    const payload = decodeV2();
+    const payload = decode();
 
     expect(payload).toBeDefined();
 
@@ -528,7 +528,7 @@ describe("parseOrder v2 idempotency key", () => {
   });
 
   it("reads a null idempotency key as absent", () => {
-    const payload = decodeV2({ idempotency_key: null });
+    const payload = decode({ idempotency_key: null });
 
     expect(payload).toBeDefined();
 
@@ -539,7 +539,7 @@ describe("parseOrder v2 idempotency key", () => {
 
   it("reads a blank idempotency key as absent", () => {
     for (const idempotency_key of BLANK_TEXTS) {
-      const payload = decodeV2({ idempotency_key });
+      const payload = decode({ idempotency_key });
 
       expect(payload).toBeDefined();
 
@@ -551,7 +551,7 @@ describe("parseOrder v2 idempotency key", () => {
 
   it("drops a non-string idempotency key instead of rejecting the order", () => {
     for (const idempotency_key of NON_STRING_VALUES) {
-      const payload = decodeV2({ idempotency_key });
+      const payload = decode({ idempotency_key });
 
       expect(payload).toBeDefined();
 
@@ -568,7 +568,7 @@ describe("parseOrder v2 idempotency key", () => {
   });
 });
 
-describe("parseOrder v2 rejections", () => {
+describe("parseOrder rejections", () => {
   it("rejects an order with no customer", () => {
     const order = buildOrder();
 
@@ -585,13 +585,13 @@ describe("parseOrder v2 rejections", () => {
 
   it("rejects a customer whose first name is blank", () => {
     expectReject(
-      { customer: buildCustomerV2({ first_name: "   " }) },
+      { customer: buildCustomer({ first_name: "   " }) },
       "customer_field_missing"
     );
   });
 
   it("rejects a customer with no phone", () => {
-    const customer = buildCustomerV2();
+    const customer = buildCustomer();
 
     delete customer["phone"];
 
@@ -600,7 +600,7 @@ describe("parseOrder v2 rejections", () => {
 
   it("rejects a customer whose last name is not a string", () => {
     expectReject(
-      { customer: buildCustomerV2({ last_name: 42 }) },
+      { customer: buildCustomer({ last_name: 42 }) },
       "customer_field_missing"
     );
   });
@@ -706,11 +706,11 @@ describe("parseOrder v2 rejections", () => {
   });
 });
 
-describe("parseOrder v2 style-only fields fail open", () => {
+describe("parseOrder style-only fields fail open", () => {
   it("drops a wrongly typed patronymic instead of losing the order", () => {
     for (const patronymic of [42, {}, [], true]) {
-      const payload = decodeV2({
-        customer: buildCustomerV2({ patronymic }),
+      const payload = decode({
+        customer: buildCustomer({ patronymic }),
       });
 
       expect(payload?.customer.patronymic).toBeUndefined();
@@ -718,8 +718,8 @@ describe("parseOrder v2 style-only fields fail open", () => {
   });
 
   it("drops a contact channel that arrives as an option object", () => {
-    const payload = decodeV2({
-      customer: buildCustomerV2({
+    const payload = decode({
+      customer: buildCustomer({
         contact_channel: { label: "Telegram", value: "telegram" },
       }),
     });
@@ -731,13 +731,13 @@ describe("parseOrder v2 style-only fields fail open", () => {
 
   it("drops a wrongly typed comment instead of losing the order", () => {
     for (const comment of [false, 42, {}, []]) {
-      expect(decodeV2({ comment })?.comment).toBeUndefined();
+      expect(decode({ comment })?.comment).toBeUndefined();
     }
   });
 
   it("drops a wrongly typed delivery source instead of losing the order", () => {
     for (const source of [1, {}, [], true]) {
-      const payload = decodeV2({
+      const payload = decode({
         delivery: buildDeliveryBranch({ source }),
       });
 
@@ -751,7 +751,7 @@ describe("parseOrder v2 style-only fields fail open", () => {
 
   it("drops a wrongly typed warehouse number instead of losing the order", () => {
     for (const warehouse_number of [true, [], {}, 1.5, -1, Number.NaN]) {
-      const payload = decodeV2({
+      const payload = decode({
         delivery: buildDeliveryBranch({ warehouse_number }),
       });
 
@@ -767,7 +767,7 @@ describe("parseOrder v2 style-only fields fail open", () => {
   });
 
   it("drops a wrongly typed country and state instead of losing the order", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryGeneric({ country: 1, state: 0 }),
     });
 
@@ -781,7 +781,7 @@ describe("parseOrder v2 style-only fields fail open", () => {
   });
 
   it("drops a wrongly typed apartment but keeps a whole number", () => {
-    const dropped = decodeV2({
+    const dropped = decode({
       delivery: buildDeliveryCourier({ apartment: 1.5 }),
     });
 
@@ -789,7 +789,7 @@ describe("parseOrder v2 style-only fields fail open", () => {
       expect(dropped.delivery.apartment).toBeUndefined();
     }
 
-    const kept = decodeV2({
+    const kept = decode({
       delivery: buildDeliveryCourier({ apartment: 12 }),
     });
 
@@ -808,13 +808,13 @@ describe("parseOrder v2 style-only fields fail open", () => {
       "delivery_mode_unknown"
     );
     expectReject(
-      { customer: buildCustomerV2({ first_name: 42 }) },
+      { customer: buildCustomer({ first_name: 42 }) },
       "customer_field_missing"
     );
   });
 });
 
-describe("parseOrder shared payload rules on the v2 path", () => {
+describe("parseOrder shared payload rules", () => {
   it("rejects every coercible total that would render a plausible figure", () => {
     for (const total of GARBAGE_TOTALS) {
       expectReject({ total }, "total_not_plain_decimal");
@@ -827,7 +827,7 @@ describe("parseOrder shared payload rules on the v2 path", () => {
   });
 
   it("accepts a total right at the digit bound", () => {
-    const payload = decodeV2({ total: "9".repeat(20) });
+    const payload = decode({ total: "9".repeat(20) });
 
     expect(payload).toBeDefined();
 
@@ -861,7 +861,7 @@ describe("parseOrder shared payload rules on the v2 path", () => {
   });
 
   it("accepts an unknown but valid locale", () => {
-    expect(decodeV2({ locale: "pl" })).toBeDefined();
+    expect(decode({ locale: "pl" })).toBeDefined();
   });
 
   it("rejects a cart that is not an array", () => {
@@ -934,16 +934,14 @@ describe("parseOrder shared payload rules on the v2 path", () => {
   });
 });
 
-describe("parseOrder v2 tolerance", () => {
+describe("parseOrder tolerance", () => {
   it("tolerates unknown extra keys at the top level", () => {
-    expect(
-      decodeV2({ utm_source: "telegram", nested: { a: 1 } })
-    ).toBeDefined();
+    expect(decode({ utm_source: "telegram", nested: { a: 1 } })).toBeDefined();
   });
 
   it("tolerates unknown extra keys inside the customer", () => {
-    const payload = decodeV2({
-      customer: buildCustomerV2({ middle_name: "Іван", loyalty: { tier: 3 } }),
+    const payload = decode({
+      customer: buildCustomer({ middle_name: "Іван", loyalty: { tier: 3 } }),
     });
 
     expect(payload).toBeDefined();
@@ -954,7 +952,7 @@ describe("parseOrder v2 tolerance", () => {
   });
 
   it("tolerates unknown extra keys inside the delivery", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryBranch({ warehouse_ref: "uuid", geo: [49, 24] }),
     });
 
@@ -970,7 +968,7 @@ describe("parseOrder v2 tolerance", () => {
 
     item["sku"] = "UTG-001";
 
-    const payload = decodeV2({ cart: [item] });
+    const payload = decode({ cart: [item] });
 
     expect(payload).toBeDefined();
 
@@ -981,7 +979,7 @@ describe("parseOrder v2 tolerance", () => {
   });
 
   it("accepts a stray source on a generic delivery and does not store it", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryGeneric({ source: "np_directory" }),
     });
 
@@ -994,7 +992,7 @@ describe("parseOrder v2 tolerance", () => {
   });
 
   it("normalises a numeric warehouse number to a string", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryBranch({ warehouse_number: 1 }),
     });
 
@@ -1006,8 +1004,8 @@ describe("parseOrder v2 tolerance", () => {
   });
 
   it("accepts a contact channel nobody pinned", () => {
-    const payload = decodeV2({
-      customer: buildCustomerV2({ contact_channel: "дзвінок" }),
+    const payload = decode({
+      customer: buildCustomer({ contact_channel: "дзвінок" }),
     });
 
     expect(payload).toBeDefined();
@@ -1018,7 +1016,7 @@ describe("parseOrder v2 tolerance", () => {
   });
 
   it("accepts an unknown future source and degrades it to absent", () => {
-    const payload = decodeV2({
+    const payload = decode({
       delivery: buildDeliveryBranch({ source: "np_directory_street" }),
     });
 
@@ -1030,9 +1028,9 @@ describe("parseOrder v2 tolerance", () => {
   });
 });
 
-describe("parseOrder v2 delivery mode and locale independence", () => {
+describe("parseOrder delivery mode and locale independence", () => {
   it("decodes a generic delivery under the uk locale", () => {
-    const payload = decodeV2({
+    const payload = decode({
       locale: "uk",
       delivery: buildDeliveryGeneric(),
     });
@@ -1046,7 +1044,7 @@ describe("parseOrder v2 delivery mode and locale independence", () => {
   });
 
   it("decodes a branch delivery under the en locale", () => {
-    const payload = decodeV2({ locale: "en", delivery: buildDeliveryBranch() });
+    const payload = decode({ locale: "en", delivery: buildDeliveryBranch() });
 
     expect(payload).toBeDefined();
 
@@ -1057,9 +1055,9 @@ describe("parseOrder v2 delivery mode and locale independence", () => {
   });
 });
 
-describe("parseOrderPayloadV2", () => {
-  it("decodes a v2 body handed straight to it", () => {
-    const payload = payloadOf(parseOrderPayloadV2(buildOrder()));
+describe("parseOrderPayload", () => {
+  it("decodes a body handed straight to it", () => {
+    const payload = payloadOf(parseOrderPayload(buildOrder()));
 
     expect(payload).toBeDefined();
 
@@ -1074,7 +1072,7 @@ describe("parseOrderPayloadV2", () => {
 
     delete order["locale"];
 
-    const rejected = parseOrderPayloadV2(order);
+    const rejected = parseOrderPayload(order);
 
     expect(rejected.ok).toBe(false);
 
@@ -1082,17 +1080,17 @@ describe("parseOrderPayloadV2", () => {
       expect(rejected.reason).toBe("locale_not_string");
     }
 
-    const payload = payloadOf(parseOrderPayloadV2(buildOrder({ version: 99 })));
+    const payload = payloadOf(parseOrderPayload(buildOrder({ version: 99 })));
 
     expect(payload).toBeDefined();
   });
 
-  it("names the v2 reason without any dispatch help", () => {
+  it("names the reason without any dispatch help", () => {
     const order = buildOrder();
 
     delete order["customer"];
 
-    const result = parseOrderPayloadV2(order);
+    const result = parseOrderPayload(order);
 
     expect(result.ok).toBe(false);
 
@@ -1200,7 +1198,7 @@ describe("the reject reason set", () => {
 
     for (const key of CUSTOMER_KEYS) {
       for (const value of HOSTILE_VALUES) {
-        out.push(buildOrder({ customer: buildCustomerV2({ [key]: value }) }));
+        out.push(buildOrder({ customer: buildCustomer({ [key]: value }) }));
       }
     }
 

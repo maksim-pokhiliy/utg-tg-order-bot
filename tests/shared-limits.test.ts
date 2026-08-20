@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { renderOrder } from "../src/messageV2.js";
-import { parseOrder } from "../src/payloadV2.js";
+import { renderOrder } from "../src/message.js";
+import { parseOrder } from "../src/payload.js";
 import {
   buildCartItem,
   buildDeliveryGeneric,
@@ -68,7 +68,7 @@ describe("the budget measured in the unit telegram counts (BDEF-4)", () => {
     expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
   });
 
-  it("keeps a v2 order with the same cart under the limit", () => {
+  it("keeps the same cart under the limit behind a free-form address", () => {
     const message = render(
       buildOrder({
         delivery: buildDeliveryGeneric(),
@@ -106,7 +106,7 @@ describe("the shared telegram budget", () => {
     expect(message).toMatch(/… <b>\+1 more positions<\/b>$/u);
   });
 
-  it("spends the same budget and marks the same way on the v2 path", () => {
+  it("spends the same budget and marks the same way behind a free-form address", () => {
     const v2 = render(
       buildOrder({
         locale: "uk",

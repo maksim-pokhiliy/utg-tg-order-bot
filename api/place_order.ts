@@ -1,6 +1,6 @@
 import { isAuthorized } from "../src/auth.js";
-import { renderOrder } from "../src/messageV2.js";
-import { parseOrder, type OrderEnvelope } from "../src/payloadV2.js";
+import { renderOrder } from "../src/message.js";
+import { parseOrder, type OrderEnvelope } from "../src/payload.js";
 import {
   attemptLogFields,
   createAttempt,

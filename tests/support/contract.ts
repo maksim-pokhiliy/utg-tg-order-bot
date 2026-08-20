@@ -1,4 +1,4 @@
-export const ORDER_V2_KEYS = [
+export const ORDER_KEYS = [
   "version",
   "idempotency_key",
   "locale",
@@ -10,7 +10,7 @@ export const ORDER_V2_KEYS = [
   "currency",
 ] as const;
 
-export const ORDER_V2_CUSTOMER_KEYS = [
+export const ORDER_CUSTOMER_KEYS = [
   "first_name",
   "last_name",
   "patronymic",
@@ -18,7 +18,7 @@ export const ORDER_V2_CUSTOMER_KEYS = [
   "contact_channel",
 ] as const;
 
-export const ORDER_V2_DELIVERY_BRANCH_KEYS = [
+export const ORDER_DELIVERY_BRANCH_KEYS = [
   "mode",
   "source",
   "city",
@@ -26,7 +26,7 @@ export const ORDER_V2_DELIVERY_BRANCH_KEYS = [
   "warehouse_number",
 ] as const;
 
-export const ORDER_V2_DELIVERY_COURIER_KEYS = [
+export const ORDER_DELIVERY_COURIER_KEYS = [
   "mode",
   "source",
   "city",
@@ -35,7 +35,7 @@ export const ORDER_V2_DELIVERY_COURIER_KEYS = [
   "apartment",
 ] as const;
 
-export const ORDER_V2_DELIVERY_GENERIC_KEYS = [
+export const ORDER_DELIVERY_GENERIC_KEYS = [
   "mode",
   "country",
   "state",

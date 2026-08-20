@@ -3,7 +3,7 @@ import {
   readOptionalText,
   readText,
   type RejectReason,
-} from "./payload.js";
+} from "./decode.js";
 
 const DELIVERY_MODES = [
   "np_branch",

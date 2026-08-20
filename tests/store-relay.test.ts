@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "../api/place_order.js";
 import { hashOrder } from "../src/orderHash.js";
-import { parseOrder } from "../src/payloadV2.js";
+import { parseOrder } from "../src/payload.js";
 import {
   BOT_TOKEN,
   buildCartItem,

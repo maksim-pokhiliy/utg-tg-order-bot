@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import type { OrderEnvelope } from "./payloadV2.js";
+import type { OrderEnvelope } from "./payload.js";
 
 export const canonicalize = (value: unknown): string => {
   if (value === null) {

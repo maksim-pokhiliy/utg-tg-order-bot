@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../api/place_order.js";
 import {
   CART_ITEM_KEYS,
-  ORDER_V2_CUSTOMER_KEYS,
-  ORDER_V2_DELIVERY_BRANCH_KEYS,
-  ORDER_V2_DELIVERY_COURIER_KEYS,
-  ORDER_V2_DELIVERY_GENERIC_KEYS,
-  ORDER_V2_KEYS,
+  ORDER_CUSTOMER_KEYS,
+  ORDER_DELIVERY_BRANCH_KEYS,
+  ORDER_DELIVERY_COURIER_KEYS,
+  ORDER_DELIVERY_GENERIC_KEYS,
+  ORDER_KEYS,
 } from "./support/contract.js";
 import {
   BOT_TOKEN,
@@ -117,21 +117,19 @@ describe("the payload contract", () => {
   it("reads exactly the pinned top-level keys and nothing else", async () => {
     const { top } = await runAndRecord(buildOrder());
 
-    expect(sorted([...top])).toEqual(sorted(ORDER_V2_KEYS));
+    expect(sorted([...top])).toEqual(sorted(ORDER_KEYS));
   });
 
   it("reads exactly the pinned customer keys and nothing else", async () => {
     const { customer } = await runAndRecord(buildOrder());
 
-    expect(sorted([...customer])).toEqual(sorted(ORDER_V2_CUSTOMER_KEYS));
+    expect(sorted([...customer])).toEqual(sorted(ORDER_CUSTOMER_KEYS));
   });
 
   it("reads exactly the pinned warehouse delivery keys and nothing else", async () => {
     const { delivery } = await runAndRecord(buildOrder());
 
-    expect(sorted([...delivery])).toEqual(
-      sorted(ORDER_V2_DELIVERY_BRANCH_KEYS)
-    );
+    expect(sorted([...delivery])).toEqual(sorted(ORDER_DELIVERY_BRANCH_KEYS));
   });
 
   it("reads exactly the pinned courier delivery keys and nothing else", async () => {
@@ -139,9 +137,7 @@ describe("the payload contract", () => {
       buildOrder({ delivery: buildDeliveryCourier() })
     );
 
-    expect(sorted([...delivery])).toEqual(
-      sorted(ORDER_V2_DELIVERY_COURIER_KEYS)
-    );
+    expect(sorted([...delivery])).toEqual(sorted(ORDER_DELIVERY_COURIER_KEYS));
   });
 
   it("never reads a source on a generic delivery", async () => {
@@ -152,9 +148,7 @@ describe("the payload contract", () => {
       })
     );
 
-    expect(sorted([...delivery])).toEqual(
-      sorted(ORDER_V2_DELIVERY_GENERIC_KEYS)
-    );
+    expect(sorted([...delivery])).toEqual(sorted(ORDER_DELIVERY_GENERIC_KEYS));
     expect(delivery.has("source")).toBe(false);
   });
 
@@ -214,11 +208,11 @@ describe("version 2 is the only shape the relay accepts", () => {
 
 describe("the pinned key sets", () => {
   it("pins the key sets against accidental growth", () => {
-    expect(ORDER_V2_KEYS).toHaveLength(9);
-    expect(ORDER_V2_CUSTOMER_KEYS).toHaveLength(5);
-    expect(ORDER_V2_DELIVERY_BRANCH_KEYS).toHaveLength(5);
-    expect(ORDER_V2_DELIVERY_COURIER_KEYS).toHaveLength(6);
-    expect(ORDER_V2_DELIVERY_GENERIC_KEYS).toHaveLength(5);
+    expect(ORDER_KEYS).toHaveLength(9);
+    expect(ORDER_CUSTOMER_KEYS).toHaveLength(5);
+    expect(ORDER_DELIVERY_BRANCH_KEYS).toHaveLength(5);
+    expect(ORDER_DELIVERY_COURIER_KEYS).toHaveLength(6);
+    expect(ORDER_DELIVERY_GENERIC_KEYS).toHaveLength(5);
     expect(CART_ITEM_KEYS).toHaveLength(3);
   });
 });

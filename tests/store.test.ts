@@ -122,7 +122,7 @@ describe("the store request", () => {
     expect(readNeonCalls(stub)[0]?.redirect).toBe("error");
   });
 
-  it("carries the v2 key, schema version and the verbatim envelope as params", async () => {
+  it("carries the key, schema version and the verbatim envelope as params", async () => {
     const stub = stubRelayFetch();
     const attempt = createAttempt(buildEnvelope());
 

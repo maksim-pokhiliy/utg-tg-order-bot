@@ -1,124 +1,146 @@
-const TOTAL_PATTERN = /^\d+(\.\d+)?$/;
-const CURRENCY_PATTERN = /^[A-Z]{3}$/;
-const MAX_TOTAL_LENGTH = 20;
-const MAX_QUANTITY = 100_000;
+import { readDelivery, type OrderDelivery } from "./delivery.js";
+import {
+  isCurrencyCode,
+  isPlainDecimal,
+  isRecord,
+  parseCart,
+  readOptionalText,
+  readText,
+  type OrderCartItem,
+  type PlainDecimal,
+  type RejectReason,
+} from "./decode.js";
 
-export type PlainDecimal = `${number}`;
+const PAYLOAD_VERSION = 2;
 
-export type RejectReason =
-  | "body_not_object"
-  | "locale_not_string"
-  | "total_not_plain_decimal"
-  | "currency_malformed"
-  | "cart_not_array"
-  | "cart_empty"
-  | "cart_item_malformed"
-  | "version_unsupported"
-  | "customer_not_object"
-  | "customer_field_missing"
-  | "delivery_not_object"
-  | "delivery_mode_missing"
-  | "delivery_mode_unknown"
-  | "delivery_city_missing"
-  | "delivery_warehouse_missing"
-  | "delivery_street_missing"
-  | "delivery_building_missing"
-  | "delivery_address_missing";
-
-export interface OrderCartItem {
-  title: string;
-  quantity: number;
-  productUrl: string;
+export interface OrderCustomer {
+  first_name: string;
+  last_name: string;
+  patronymic: string | undefined;
+  phone: string;
+  contact_channel: string | undefined;
 }
 
-export type OptionalText =
-  { ok: true; value: string | undefined } | { ok: false };
+export interface OrderPayload {
+  customer: OrderCustomer;
+  delivery: OrderDelivery;
+  comment: string | undefined;
+  idempotency_key: string | undefined;
+  locale: string;
+  total: PlainDecimal;
+  currency: string | undefined;
+  cart: readonly OrderCartItem[];
+}
 
-export const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+export interface OrderEnvelope {
+  kind: "v2";
+  payload: OrderPayload;
+}
 
-export const isCurrencyCode = (value: unknown): value is string =>
-  typeof value === "string" && CURRENCY_PATTERN.test(value);
+export type OrderParseResult =
+  { ok: true; value: OrderEnvelope } | { ok: false; reason: RejectReason };
 
-export const isPlainDecimal = (value: unknown): value is PlainDecimal =>
-  typeof value === "string" &&
-  value.length <= MAX_TOTAL_LENGTH &&
-  TOTAL_PATTERN.test(value);
+const reject = (reason: RejectReason): OrderParseResult => ({
+  ok: false,
+  reason,
+});
 
-export const readText = (
-  source: Record<string, unknown>,
+const styleText = (
+  input: Record<string, unknown>,
   key: string
 ): string | undefined => {
-  const value = source[key];
+  const text = readOptionalText(input, key);
 
-  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+  return text.ok ? text.value : undefined;
 };
 
-export const readOptionalText = (
-  source: Record<string, unknown>,
-  key: string
-): OptionalText => {
-  const value = source[key];
-
-  if (value === undefined || value === null) {
-    return { ok: true, value: undefined };
-  }
-
-  if (typeof value !== "string") {
-    return { ok: false };
-  }
-
-  return { ok: true, value: value.trim() === "" ? undefined : value };
-};
-
-const parseCartItem = (input: unknown): OrderCartItem | undefined => {
+const readCustomer = (input: unknown): OrderCustomer | RejectReason => {
   if (!isRecord(input)) {
-    return undefined;
+    return "customer_not_object";
   }
 
-  const { title, quantity, productUrl } = input;
+  const first_name = readText(input, "first_name");
+  const last_name = readText(input, "last_name");
+  const phone = readText(input, "phone");
 
-  if (typeof title !== "string" || title.trim() === "") {
-    return undefined;
+  if (
+    first_name === undefined ||
+    last_name === undefined ||
+    phone === undefined
+  ) {
+    return "customer_field_missing";
   }
 
-  if (typeof productUrl !== "string" || productUrl.trim() === "") {
-    return undefined;
-  }
-
-  if (typeof quantity !== "number" || !Number.isInteger(quantity)) {
-    return undefined;
-  }
-
-  if (quantity < 1 || quantity > MAX_QUANTITY) {
-    return undefined;
-  }
-
-  return { title, quantity, productUrl };
+  return {
+    first_name,
+    last_name,
+    patronymic: styleText(input, "patronymic"),
+    phone,
+    contact_channel: styleText(input, "contact_channel"),
+  };
 };
 
-export const parseCart = (
-  input: unknown
-): readonly OrderCartItem[] | RejectReason => {
-  if (!Array.isArray(input)) {
-    return "cart_not_array";
+export const parseOrderPayload = (
+  input: Record<string, unknown>
+): OrderParseResult => {
+  const customer = readCustomer(input["customer"]);
+
+  if (typeof customer === "string") {
+    return reject(customer);
   }
 
-  if (input.length === 0) {
-    return "cart_empty";
+  const delivery = readDelivery(input["delivery"]);
+
+  if (typeof delivery === "string") {
+    return reject(delivery);
   }
 
-  const items: OrderCartItem[] = [];
+  const { locale, total, currency } = input;
 
-  for (const entry of input) {
-    const item = parseCartItem(entry);
-
-    if (item === undefined) {
-      return "cart_item_malformed";
-    }
-
-    items.push(item);
+  if (typeof locale !== "string") {
+    return reject("locale_not_string");
   }
 
-  return items;
+  if (!isPlainDecimal(total)) {
+    return reject("total_not_plain_decimal");
+  }
+
+  if (currency !== undefined && !isCurrencyCode(currency)) {
+    return reject("currency_malformed");
+  }
+
+  const cart = parseCart(input["cart"]);
+
+  if (typeof cart === "string") {
+    return reject(cart);
+  }
+
+  return {
+    ok: true,
+    value: {
+      kind: "v2",
+      payload: {
+        customer,
+        delivery,
+        comment: styleText(input, "comment"),
+        idempotency_key: styleText(input, "idempotency_key"),
+        locale,
+        total,
+        currency,
+        cart,
+      },
+    },
+  };
+};
+
+export const parseOrder = (input: unknown): OrderParseResult => {
+  if (!isRecord(input)) {
+    return reject("body_not_object");
+  }
+
+  if (input["version"] !== PAYLOAD_VERSION) {
+    return reject("version_unsupported");
+  }
+
+  return parseOrderPayload(input);
 };

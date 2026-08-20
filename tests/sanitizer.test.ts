@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { renderOrder } from "../src/messageV2.js";
-import { parseOrder } from "../src/payloadV2.js";
+import { renderOrder } from "../src/message.js";
+import { parseOrder } from "../src/payload.js";
 import {
   buildCartItem,
-  buildCustomerV2,
+  buildCustomer,
   buildDeliveryBranch,
   buildDeliveryCourier,
   buildDeliveryGeneric,
@@ -82,31 +82,30 @@ const lineOf = (message: string, label: string): string => {
   return line;
 };
 
-const V2_FIELDS: readonly FieldProbe[] = [
+const USER_FIELDS: readonly FieldProbe[] = [
   {
     name: "customer.first_name",
     build: (value) =>
-      buildOrder({ customer: buildCustomerV2({ first_name: value }) }),
+      buildOrder({ customer: buildCustomer({ first_name: value }) }),
   },
   {
     name: "customer.last_name",
     build: (value) =>
-      buildOrder({ customer: buildCustomerV2({ last_name: value }) }),
+      buildOrder({ customer: buildCustomer({ last_name: value }) }),
   },
   {
     name: "customer.patronymic",
     build: (value) =>
-      buildOrder({ customer: buildCustomerV2({ patronymic: value }) }),
+      buildOrder({ customer: buildCustomer({ patronymic: value }) }),
   },
   {
     name: "customer.phone",
-    build: (value) =>
-      buildOrder({ customer: buildCustomerV2({ phone: value }) }),
+    build: (value) => buildOrder({ customer: buildCustomer({ phone: value }) }),
   },
   {
     name: "customer.contact_channel",
     build: (value) =>
-      buildOrder({ customer: buildCustomerV2({ contact_channel: value }) }),
+      buildOrder({ customer: buildCustomer({ contact_channel: value }) }),
   },
   { name: "comment", build: (value) => buildOrder({ comment: value }) },
   {
@@ -190,7 +189,7 @@ const expectNothingMisleadingSurvives = (message: string): void => {
 };
 
 describe("every user-controlled field is sanitized (BDEF-5)", () => {
-  for (const field of V2_FIELDS) {
+  for (const field of USER_FIELDS) {
     it(`strips and folds misleading characters out of ${field.name}`, () => {
       expectNothingMisleadingSurvives(render(field.build(HOSTILE_PROBE)));
     });
@@ -224,7 +223,7 @@ describe("the characters that were lying to the operator", () => {
   it("escapes markup that only exists after normalization", () => {
     const message = render(
       buildOrder({
-        customer: buildCustomerV2({ first_name: "＜b＞Bobby＜/b＞" }),
+        customer: buildCustomer({ first_name: "＜b＞Bobby＜/b＞" }),
       })
     );
 
@@ -235,7 +234,7 @@ describe("the characters that were lying to the operator", () => {
   for (const [raw, escaped] of NORMALIZES_TO_MARKUP) {
     it(`escapes ${JSON.stringify(raw)}, which normalization turns into markup`, () => {
       const message = render(
-        buildOrder({ customer: buildCustomerV2({ first_name: `A${raw}B` }) })
+        buildOrder({ customer: buildCustomer({ first_name: `A${raw}B` }) })
       );
 
       expect(lineOf(message, "👤 <b>First Name:</b>")).toBe(

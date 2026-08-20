@@ -170,8 +170,8 @@ describe("POST /api/place_order", () => {
   });
 });
 
-describe("POST /api/place_order with a v2 envelope", () => {
-  it("relays a v2 order and answers 200 with the frozen success body", async () => {
+describe("POST /api/place_order with a full envelope", () => {
+  it("relays an order and answers 200 with the frozen success body", async () => {
     const fetchStub = stubTelegram();
 
     const response = await POST(new StubRequest(buildOrder()));
@@ -188,7 +188,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
     expect(sent.text).toContain("🏤 <b>Warehouse:</b>");
   });
 
-  it("parses a genuinely serialised v2 body off the wire", async () => {
+  it("parses a genuinely serialised body off the wire", async () => {
     const fetchStub = stubTelegram();
 
     const response = await POST(new JsonBodyRequest(buildOrder()));
@@ -223,7 +223,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
-  it("sends a rates-down v2 order in hryvnia and never in dollars", async () => {
+  it("sends a rates-down order in hryvnia and never in dollars", async () => {
     const fetchStub = stubTelegram();
 
     await POST(
@@ -242,7 +242,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
     expect(sent.text).not.toContain("$");
   });
 
-  it("rejects a malformed v2 body as v2 and names the real problem", async () => {
+  it("rejects a malformed body and names the real problem", async () => {
     const logs = captureConsoleWarn();
     const fetchStub = stubTelegram();
 
@@ -274,7 +274,7 @@ describe("POST /api/place_order with a v2 envelope", () => {
     expect(logged).not.toContain("required_field_missing");
   });
 
-  it("never echoes a v2 field value into the response or the log", async () => {
+  it("never echoes a field value into the response or the log", async () => {
     const logs = captureConsoleWarn();
     stubTelegram();
 

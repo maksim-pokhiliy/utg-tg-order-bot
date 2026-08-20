@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { buildOmittedMarker, omittedMarkerAllowance } from "../src/message.js";
-import { renderOrder } from "../src/messageV2.js";
+import { buildOmittedMarker, omittedMarkerAllowance } from "../src/render.js";
+import { renderOrder } from "../src/message.js";
 import {
   SATURATED_DELIVERIES,
   saturatedPayload,
@@ -18,7 +18,7 @@ const blocksIn = (message: string): number =>
 
 describe("the composed message can never exceed the telegram limit", () => {
   for (const [mode, delivery] of Object.entries(SATURATED_DELIVERIES)) {
-    it(`holds for a v2 ${mode} order with every field saturated`, () => {
+    it(`holds for a ${mode} order with every field saturated`, () => {
       const message = renderOrder({
         kind: "v2",
         payload: saturatedPayload(delivery),
