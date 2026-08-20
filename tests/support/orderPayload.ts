@@ -22,25 +22,7 @@ export const buildCartItem = (
     "https://www.ua-tactical-gear.com/uk/category/patches/waiting",
 });
 
-export const buildOrder = (
-  overrides: Record<string, unknown> = {}
-): Record<string, unknown> => ({
-  first_name: "Олександр",
-  last_name: "Петренко",
-  telephone: "+380671234567",
-  country: "Україна",
-  state: "Київська область",
-  city: "Київ",
-  address: "вул. Шевченка, 12, кв. 5",
-  additional: "",
-  locale: "uk",
-  total: "46200.00",
-  currency: "UAH",
-  cart: [buildCartItem()],
-  ...overrides,
-});
-
-export const buildCustomerV2 = (
+export const buildCustomer = (
   overrides: Record<string, unknown> = {}
 ): Record<string, unknown> => ({
   first_name: "Марія",
@@ -95,13 +77,13 @@ export const buildDeliveryGeneric = (
   ...overrides,
 });
 
-export const buildOrderV2 = (
+export const buildOrder = (
   overrides: Record<string, unknown> = {}
 ): Record<string, unknown> => ({
   version: 2,
   idempotency_key: "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731",
   locale: "uk",
-  customer: buildCustomerV2(),
+  customer: buildCustomer(),
   delivery: buildDeliveryBranch(),
   comment: "після 18:00",
   cart: [buildCartItem()],

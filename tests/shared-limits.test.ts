@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { renderOrder } from "../src/messageV2.js";
-import { parseOrder } from "../src/payloadV2.js";
+import { renderOrder } from "../src/message.js";
+import { parseOrder } from "../src/payload.js";
 import {
   buildCartItem,
   buildDeliveryGeneric,
   buildOrder,
-  buildOrderV2,
 } from "./support/orderPayload.js";
 
 const TELEGRAM_LIMIT = 4096;
 const BOUNDARY_CART_SIZE = 40;
-const BOUNDARY_NOTE = 364;
+const BOUNDARY_NOTE = 216;
 const BOUNDARY_ITEMS = 40;
 const OVER_BOUNDARY_ITEMS = 39;
 const CART_TITLE_LIMIT = 200;
@@ -57,7 +56,7 @@ describe("the budget measured in the unit telegram counts (BDEF-4)", () => {
 
     expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
     expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
-    expect(message).toContain("👤 <b>First Name:</b> Олександр");
+    expect(message).toContain("👤 <b>First Name:</b> Марія");
     expect(message).toContain("💲 <b>Total:</b>");
   });
 
@@ -69,9 +68,9 @@ describe("the budget measured in the unit telegram counts (BDEF-4)", () => {
     expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
   });
 
-  it("keeps a v2 order with the same cart under the limit", () => {
+  it("keeps the same cart under the limit behind a free-form address", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryGeneric(),
         cart: reproCart(""),
       })
@@ -86,7 +85,7 @@ describe("the shared telegram budget", () => {
   it("fits exactly the cart the budget has room for", () => {
     const message = render(
       buildOrder({
-        additional: "x".repeat(BOUNDARY_NOTE),
+        comment: "x".repeat(BOUNDARY_NOTE),
         cart: boundaryCart(),
       })
     );
@@ -98,7 +97,7 @@ describe("the shared telegram budget", () => {
   it("drops one position as soon as the header grows by a single character", () => {
     const message = render(
       buildOrder({
-        additional: "x".repeat(BOUNDARY_NOTE + 1),
+        comment: "x".repeat(BOUNDARY_NOTE + 1),
         cart: boundaryCart(),
       })
     );
@@ -107,9 +106,9 @@ describe("the shared telegram budget", () => {
     expect(message).toMatch(/… <b>\+1 more positions<\/b>$/u);
   });
 
-  it("spends the same budget and marks the same way on the v2 path", () => {
-    const v2 = render(
-      buildOrderV2({
+  it("spends the same budget and marks the same way behind a free-form address", () => {
+    const message = render(
+      buildOrder({
         locale: "uk",
         delivery: buildDeliveryGeneric(),
         comment: "x".repeat(BOUNDARY_NOTE),
@@ -117,9 +116,9 @@ describe("the shared telegram budget", () => {
       })
     );
 
-    expect(v2.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-    expect(v2).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
-    expect(itemsIn(v2)).toBeGreaterThan(0);
+    expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+    expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
+    expect(itemsIn(message)).toBeGreaterThan(0);
   });
 
   it("never grows the cart when the header grows", () => {
@@ -127,7 +126,7 @@ describe("the shared telegram budget", () => {
 
     for (const note of [0, 100, 200, 300, 400, 500, 600]) {
       const message = render(
-        buildOrder({ additional: "x".repeat(note), cart: boundaryCart() })
+        buildOrder({ comment: "x".repeat(note), cart: boundaryCart() })
       );
 
       const items = itemsIn(message);
@@ -180,16 +179,6 @@ describe("the shared cart clamps", () => {
       `🔗 <b>Product URL:</b> ${productUrl.slice(0, CART_URL_LIMIT)}…`
     );
   });
-
-  it("carries both clamps identically onto the v2 path", () => {
-    const title = "т".repeat(CART_TITLE_LIMIT + 1);
-    const v1 = render(buildOrder({ cart: [buildCartItem({ title })] }));
-    const v2 = render(buildOrderV2({ cart: [buildCartItem({ title })] }));
-    const clamped = `${TITLE_LABEL} ${"т".repeat(CART_TITLE_LIMIT)}…`;
-
-    expect(v1).toContain(clamped);
-    expect(v2).toContain(clamped);
-  });
 });
 
 describe("the clamps that no accepted payload can reach", () => {
@@ -215,8 +204,42 @@ describe("the clamps that no accepted payload can reach", () => {
   it("bounds the work an escape-heavy note can force", () => {
     const before = process.memoryUsage().heapUsed;
 
-    render(buildOrder({ additional: "&".repeat(4_000_000) }));
+    render(buildOrder({ comment: "&".repeat(4_000_000) }));
 
     expect(process.memoryUsage().heapUsed - before).toBeLessThan(60_000_000);
+  });
+});
+
+describe("no order the decoder accepts can exceed the telegram limit", () => {
+  const CART_SIZES = [1, 5, 9, 13, 17, 21, 25, 31, 40];
+  const TITLE_LENGTHS = [1, 40, 96, 144, 200];
+  const COMMENT_LENGTHS = [0, 51, 101, 200, 600];
+
+  it("holds across the cart, title and comment ranges the composer must budget", () => {
+    let widest = 0;
+
+    for (const size of CART_SIZES) {
+      for (const titleLength of TITLE_LENGTHS) {
+        for (const commentLength of COMMENT_LENGTHS) {
+          const message = render(
+            buildOrder({
+              comment: "к".repeat(commentLength),
+              cart: Array.from({ length: size }, (_, index) =>
+                buildCartItem({
+                  title: `${String(index)}${"т".repeat(titleLength)}`,
+                  productUrl: REPRO_URL,
+                })
+              ),
+            })
+          );
+
+          widest = Math.max(widest, message.length);
+
+          expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+        }
+      }
+    }
+
+    expect(widest).toBeGreaterThan(TELEGRAM_LIMIT - 100);
   });
 });

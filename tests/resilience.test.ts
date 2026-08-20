@@ -193,10 +193,13 @@ describe("the handler boundary", () => {
   it("answers the frozen opaque 500 when a module the handler calls throws", async () => {
     const logs = captureConsoleError();
 
+    let doubledCalls = 0;
+
     stubTelegram();
     vi.resetModules();
-    vi.doMock("../src/messageV2.js", () => ({
+    vi.doMock("../src/message.js", () => ({
       renderOrder: (): string => {
+        doubledCalls += 1;
         throw new RangeError("simulated invariant break");
       },
     }));
@@ -206,6 +209,7 @@ describe("the handler boundary", () => {
 
       const response = await guarded(new StubRequest(buildOrder()));
 
+      expect(doubledCalls).toBe(1);
       expect(response.status).toBe(500);
       await expect(response.json()).resolves.toEqual({ status: "error" });
 
@@ -215,7 +219,7 @@ describe("the handler boundary", () => {
       expect(logged).toContain("RangeError");
       expect(logged).not.toContain("simulated invariant break");
     } finally {
-      vi.doUnmock("../src/messageV2.js");
+      vi.doUnmock("../src/message.js");
       vi.resetModules();
     }
   });

@@ -12,11 +12,10 @@
   "scripts": {
     "test": "vitest --run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "smoke": "node scripts/load-smoke.mjs",
-    "capture:v1-corpus": "node scripts/capture-v1-corpus.mjs master"
+    "smoke": "node scripts/load-smoke.mjs"
   },
   "devDependencies": {
     "@types/node": "^24",

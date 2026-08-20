@@ -3,24 +3,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../api/place_order.js";
 import {
   CART_ITEM_KEYS,
-  ORDER_PAYLOAD_KEYS,
-  ORDER_V2_CUSTOMER_KEYS,
-  ORDER_V2_DELIVERY_BRANCH_KEYS,
-  ORDER_V2_DELIVERY_COURIER_KEYS,
-  ORDER_V2_DELIVERY_GENERIC_KEYS,
-  ORDER_V2_KEYS,
+  ORDER_CUSTOMER_KEYS,
+  ORDER_DELIVERY_BRANCH_KEYS,
+  ORDER_DELIVERY_COURIER_KEYS,
+  ORDER_DELIVERY_GENERIC_KEYS,
+  ORDER_KEYS,
 } from "./support/contract.js";
 import {
   BOT_TOKEN,
-  buildCustomerV2,
+  buildCartItem,
   buildDeliveryCourier,
   buildDeliveryGeneric,
   buildOrder,
-  buildOrderV2,
   CHAT_ID,
   RELAY_URL,
 } from "./support/orderPayload.js";
-import { stubTelegram } from "./support/telegram.js";
+import {
+  captureConsoleWarn,
+  joinLoggedLines,
+  stubTelegram,
+} from "./support/telegram.js";
 
 const IGNORED_KEYS = new Set(["then", "length", "constructor"]);
 
@@ -115,11 +117,43 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("the v1 payload contract", () => {
+describe("the payload contract", () => {
   it("reads exactly the pinned top-level keys and nothing else", async () => {
     const { top } = await runAndRecord(buildOrder());
 
-    expect(sorted([...top])).toEqual(sorted(ORDER_PAYLOAD_KEYS));
+    expect(sorted([...top])).toEqual(sorted(ORDER_KEYS));
+  });
+
+  it("reads exactly the pinned customer keys and nothing else", async () => {
+    const { customer } = await runAndRecord(buildOrder());
+
+    expect(sorted([...customer])).toEqual(sorted(ORDER_CUSTOMER_KEYS));
+  });
+
+  it("reads exactly the pinned warehouse delivery keys and nothing else", async () => {
+    const { delivery } = await runAndRecord(buildOrder());
+
+    expect(sorted([...delivery])).toEqual(sorted(ORDER_DELIVERY_BRANCH_KEYS));
+  });
+
+  it("reads exactly the pinned courier delivery keys and nothing else", async () => {
+    const { delivery } = await runAndRecord(
+      buildOrder({ delivery: buildDeliveryCourier() })
+    );
+
+    expect(sorted([...delivery])).toEqual(sorted(ORDER_DELIVERY_COURIER_KEYS));
+  });
+
+  it("never reads a source on a generic delivery", async () => {
+    const { delivery } = await runAndRecord(
+      buildOrder({
+        locale: "en",
+        delivery: buildDeliveryGeneric({ source: "np_directory" }),
+      })
+    );
+
+    expect(sorted([...delivery])).toEqual(sorted(ORDER_DELIVERY_GENERIC_KEYS));
+    expect(delivery.has("source")).toBe(false);
   });
 
   it("reads exactly the pinned cart item keys and nothing else", async () => {
@@ -127,82 +161,69 @@ describe("the v1 payload contract", () => {
 
     expect(sorted([...item])).toEqual(sorted(CART_ITEM_KEYS));
   });
+});
 
-  it("never reaches into v2 nests a v1 body happens to carry", async () => {
-    const { customer, delivery, top } = await runAndRecord(
-      buildOrder({
-        customer: buildCustomerV2(),
-        delivery: buildDeliveryCourier(),
-      })
-    );
+describe("version 2 is the only shape the relay accepts", () => {
+  const expectRejected = async (
+    payload: Record<string, unknown>
+  ): Promise<void> => {
+    const response = await POST(new RecordingRequest(payload));
 
-    expect([...customer]).toEqual([]);
-    expect([...delivery]).toEqual([]);
-    expect(top.has("customer")).toBe(false);
-    expect(top.has("delivery")).toBe(false);
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe('{"status":"error"}');
+  };
+
+  it("accepts a version 2 envelope", async () => {
+    const response = await POST(new RecordingRequest(buildOrder()));
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe('{"status":"success"}');
+  });
+
+  it("refuses a body that states no version", async () => {
+    const order = buildOrder();
+
+    delete order["version"];
+
+    await expectRejected(order);
+  });
+
+  it("refuses the retired version 1", async () => {
+    await expectRejected(buildOrder({ version: 1 }));
+  });
+
+  it("refuses a v1-shaped body, as an unrecognised payload and nothing more", async () => {
+    const logs = captureConsoleWarn();
+
+    await expectRejected({
+      first_name: "Олександр",
+      last_name: "Петренко",
+      telephone: "+380671234567",
+      country: "Україна",
+      state: "Київська область",
+      city: "Київ",
+      address: "вул. Шевченка, 12, кв. 5",
+      additional: "",
+      locale: "uk",
+      total: "46200.00",
+      currency: "UAH",
+      cart: [buildCartItem()],
+    });
+
+    const logged = joinLoggedLines(logs);
+
+    expect(logged).toContain("version_unsupported");
+    expect(logged).not.toContain("customer_not_object");
   });
 });
 
-describe("the v2 payload contract", () => {
-  it("reads exactly the pinned top-level keys and nothing else", async () => {
-    const { top } = await runAndRecord(buildOrderV2());
-
-    expect(sorted([...top])).toEqual(sorted(ORDER_V2_KEYS));
-  });
-
-  it("reads exactly the pinned customer keys and nothing else", async () => {
-    const { customer } = await runAndRecord(buildOrderV2());
-
-    expect(sorted([...customer])).toEqual(sorted(ORDER_V2_CUSTOMER_KEYS));
-  });
-
-  it("reads exactly the pinned warehouse delivery keys and nothing else", async () => {
-    const { delivery } = await runAndRecord(buildOrderV2());
-
-    expect(sorted([...delivery])).toEqual(
-      sorted(ORDER_V2_DELIVERY_BRANCH_KEYS)
-    );
-  });
-
-  it("reads exactly the pinned courier delivery keys and nothing else", async () => {
-    const { delivery } = await runAndRecord(
-      buildOrderV2({ delivery: buildDeliveryCourier() })
-    );
-
-    expect(sorted([...delivery])).toEqual(
-      sorted(ORDER_V2_DELIVERY_COURIER_KEYS)
-    );
-  });
-
-  it("never reads a source on a generic delivery", async () => {
-    const { delivery } = await runAndRecord(
-      buildOrderV2({
-        locale: "en",
-        delivery: buildDeliveryGeneric({ source: "np_directory" }),
-      })
-    );
-
-    expect(sorted([...delivery])).toEqual(
-      sorted(ORDER_V2_DELIVERY_GENERIC_KEYS)
-    );
-    expect(delivery.has("source")).toBe(false);
-  });
-
-  it("reads the same cart item keys as v1", async () => {
-    const { item } = await runAndRecord(buildOrderV2());
-
-    expect(sorted([...item])).toEqual(sorted(CART_ITEM_KEYS));
-  });
-});
-
-describe("both wire shapes together", () => {
+describe("the pinned key sets", () => {
   it("pins the key sets against accidental growth", () => {
-    expect(ORDER_PAYLOAD_KEYS).toHaveLength(13);
-    expect(ORDER_V2_KEYS).toHaveLength(9);
-    expect(ORDER_V2_CUSTOMER_KEYS).toHaveLength(5);
-    expect(ORDER_V2_DELIVERY_BRANCH_KEYS).toHaveLength(5);
-    expect(ORDER_V2_DELIVERY_COURIER_KEYS).toHaveLength(6);
-    expect(ORDER_V2_DELIVERY_GENERIC_KEYS).toHaveLength(5);
+    expect(ORDER_KEYS).toHaveLength(9);
+    expect(ORDER_CUSTOMER_KEYS).toHaveLength(5);
+    expect(ORDER_DELIVERY_BRANCH_KEYS).toHaveLength(5);
+    expect(ORDER_DELIVERY_COURIER_KEYS).toHaveLength(6);
+    expect(ORDER_DELIVERY_GENERIC_KEYS).toHaveLength(5);
     expect(CART_ITEM_KEYS).toHaveLength(3);
   });
 });

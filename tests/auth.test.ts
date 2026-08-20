@@ -11,6 +11,23 @@ import { stubTelegram } from "./support/telegram.js";
 
 const SECRET = "s3cr3t-relay-value";
 
+class CountingBodyRequest extends Request {
+  readonly #payload: unknown;
+
+  reads = 0;
+
+  constructor(payload: unknown, headers: Record<string, string> = {}) {
+    super("https://relay.test/api/place_order", { method: "POST", headers });
+    this.#payload = payload;
+  }
+
+  override json = (): Promise<unknown> => {
+    this.reads += 1;
+
+    return Promise.resolve(this.#payload);
+  };
+}
+
 const post = async (headers: Record<string, string> = {}): Promise<Response> =>
   POST(new StubRequest(buildOrder(), headers));
 
@@ -90,5 +107,27 @@ describe("relay auth", () => {
     await post();
 
     expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it("never reads the body of a caller it is about to reject", async () => {
+    vi.stubEnv("ORDER_RELAY_SECRET", SECRET);
+
+    const request = new CountingBodyRequest(buildOrder());
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    expect(request.reads).toBe(0);
+  });
+
+  it("reads the body only once the caller is authorized", async () => {
+    vi.stubEnv("ORDER_RELAY_SECRET", SECRET);
+
+    const request = new CountingBodyRequest(buildOrder(), {
+      "x-relay-secret": SECRET,
+    });
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(request.reads).toBe(1);
   });
 });

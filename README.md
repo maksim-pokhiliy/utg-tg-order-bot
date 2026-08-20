@@ -1,34 +1,16 @@
 # utg-tg-order-bot
 
-The order relay for the [Ukrainian Tactical Gear](https://www.ua-tactical-gear.com) shop — a volunteer merch store whose proceeds go to the front. The storefront POSTs its checkout payload here; this service validates it, formats one Telegram message, and delivers it to the operators' chat through the Bot API (`sendMessage`, bot `@utg_orders_bot`). It is a single zero-dependency TypeScript function on Vercel: it validates, formats and forwards, holding no state of its own.
+The order relay for the [Ukrainian Tactical Gear](https://www.ua-tactical-gear.com) shop — a volunteer merch store whose proceeds go to the front. The storefront POSTs its checkout payload here; this service validates it, formats one Telegram message, and delivers it to the operators' chat through the Bot API (`sendMessage`, bot `@utg_orders_bot`). It is a single zero-dependency TypeScript function on Vercel: it validates, formats and forwards, and since B5 it also writes every decoded order to Postgres before the send, so a failed delivery can be replayed.
 
 ## The payload contract
 
-The shop owns both shapes below. The relay never requires a key the shop does not send, and unknown keys are ignored at every level — that is what lets the shop add a field without a version bump.
+The shop owns the shape below. The relay never requires a key the shop does not send, and unknown keys are ignored at every level — that is what lets the shop add a field without a version bump.
 
-A top-level `version` selects the decoder: `2` reads the v2 envelope, an absent `version` or `1` reads the v1 shape, and any other value is rejected as `version_unsupported` rather than being pushed through a decoder that cannot describe it. Both shapes are live at once during the shop's rollout; a later step retires v1.
+A top-level `version` of exactly `2` is **required**. Anything else — absent, `1`, the string `"2"`, garbage — is rejected as `version_unsupported` rather than being pushed through a decoder that cannot describe it. The relay dual-accepted a flat v1 shape while the shop rolled over to this envelope; that shape is retired, and a body carrying it is now simply an unrecognised payload. The rejection log still records the version it observed, so a caller sending the old shape shows up as `"version":"absent"`.
 
-### v1 — the flat shape (live today)
+### The order envelope
 
-| Key                                                                           | Type     | Required | Notes                                                                                                  |
-| ----------------------------------------------------------------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| `first_name`, `last_name`, `telephone`, `country`, `state`, `city`, `address` | `string` | yes      | must be non-empty; mirrors the shop's own required-field list                                          |
-| `additional`                                                                  | `string` | no       | free-form note; routinely `""`, treated as `""` when absent                                            |
-| `locale`                                                                      | `string` | yes      | `uk`/`en` are honoured; any other tag formats with the `uk` number style                               |
-| `total`                                                                       | `string` | yes      | plain decimal already at display magnitude, e.g. `"46200.00"` — no sign, no exponent, no whitespace    |
-| `currency`                                                                    | `string` | no       | ISO-4217-shaped (`UAH`, `USD`). **Authoritative for the money figure.** Absent → derived from `locale` |
-| `cart`                                                                        | `array`  | yes      | at least one item                                                                                      |
-| `cart[].title`                                                                | `string` | yes      | non-empty; carries the size suffix when the product has one                                            |
-| `cart[].quantity`                                                             | `number` | yes      | positive integer                                                                                       |
-| `cart[].productUrl`                                                           | `string` | yes      |                                                                                                        |
-
-Other `cart[]` keys the shop sends (`id`, `price`, `image`) are accepted and ignored. A test pins the exact set of keys the relay reads, so adding a dependency on a new key fails the build.
-
-`currency` is authoritative on purpose: when the exchange-rate feed is down the shop quotes hryvnia to both locales and sends `currency: "UAH"` under `locale: "en"`. Deriving the currency from the locale would show the operator a dollar figure on a hryvnia amount.
-
-### v2 — the discriminated envelope
-
-Ukrainian delivery does not fit a flat address string, so v2 nests the recipient under `customer` and makes delivery a discriminated choice.
+Ukrainian delivery does not fit a flat address string, so the envelope nests the recipient under `customer` and makes delivery a discriminated choice.
 
 ```json
 {
@@ -56,7 +38,24 @@ Ukrainian delivery does not fit a flat address string, so v2 nests the recipient
 }
 ```
 
-`cart`, `total`, `currency` and `locale` behave exactly as in v1. `comment` replaces `additional`. `idempotency_key` is carried but never rendered and never required — a later step consumes it.
+| Key                 | Type     | Required | Notes                                                                                                  |
+| ------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `version`           | `number` | yes      | must be exactly `2`                                                                                    |
+| `locale`            | `string` | yes      | `uk`/`en` are honoured; any other tag formats with the `uk` number style                               |
+| `total`             | `string` | yes      | plain decimal already at display magnitude, e.g. `"250.00"` — no sign, no exponent, no whitespace      |
+| `currency`          | `string` | no       | ISO-4217-shaped (`UAH`, `USD`). **Authoritative for the money figure.** Absent → derived from `locale` |
+| `cart`              | `array`  | yes      | at least one item                                                                                      |
+| `cart[].title`      | `string` | yes      | non-empty; carries the size suffix when the product has one                                            |
+| `cart[].quantity`   | `number` | yes      | positive integer                                                                                       |
+| `cart[].productUrl` | `string` | yes      |                                                                                                        |
+| `comment`           | `string` | no       | free-form note; omitted when blank                                                                     |
+| `idempotency_key`   | `string` | no       | corroborates the dedupe check; never rendered                                                          |
+
+Other `cart[]` keys the shop sends (`id`, `price`, `image`) are accepted and ignored. A test pins the exact set of keys the relay reads, so adding a dependency on a new key fails the build.
+
+`currency` is authoritative on purpose: when the exchange-rate feed is down the shop quotes hryvnia to both locales and sends `currency: "UAH"` under `locale: "en"`. Deriving the currency from the locale would show the operator a dollar figure on a hryvnia amount.
+
+The relay rejects an empty `cart`, while the shop's payload composer will happily build one. That asymmetry is deliberate and unreachable in practice — checkout gates the form on a non-empty cart — and the relay stays the stricter side, because a zero-line order in front of an operator is the worse failure.
 
 | `delivery.mode` | Fields                                                |
 | --------------- | ----------------------------------------------------- |
@@ -65,7 +64,7 @@ Ukrainian delivery does not fit a flat address string, so v2 nests the recipient
 | `np_courier`    | `city`, `street`, `building`, `apartment?`, `source?` |
 | `generic`       | `country?`, `state?`, `city`, `address` — no `source` |
 
-The relay requires only what it cannot render an order without: `delivery.mode`, `city` plus (`warehouse` \| `street` + `building` \| `address`) for the resolved mode, and `customer.first_name` / `last_name` / `phone` — plus the shape rules `locale`, `total` and a non-empty `cart` inherit from v1. Everything else is optional, and optional here means the relay never trades an order for a diagnostic: `source`, `warehouse_number`, `contact_channel`, `country`, `state`, `patronymic`, `comment` and `idempotency_key` are dropped when they arrive absent, blank, `null` **or wrongly typed**, and the order goes through without them. A single-select that hands back its option object instead of the value is an ordinary front-end bug; it should cost the operator a hint, not cost a volunteer their order. `contact_channel` is rendered verbatim — the shop pins its own value set, the relay does not second-guess it.
+The relay requires only what it cannot render an order without: `delivery.mode`, `city` plus (`warehouse` \| `street` + `building` \| `address`) for the resolved mode, and `customer.first_name` / `last_name` / `phone` — plus the shape rules for `locale`, `total` and a non-empty `cart` above. Everything else is optional, and optional here means the relay never trades an order for a diagnostic: `source`, `warehouse_number`, `contact_channel`, `country`, `state`, `patronymic`, `comment` and `idempotency_key` are dropped when they arrive absent, blank, `null` **or wrongly typed**, and the order goes through without them. A single-select that hands back its option object instead of the value is an ordinary front-end bug; it should cost the operator a hint, not cost a volunteer their order. `contact_channel` is rendered verbatim — the shop pins its own value set, the relay does not second-guess it.
 
 `source` tells the operator where the address came from: `np_directory` means it was picked out of the carrier's directory, `manual` means it was typed by hand and renders as _verify on the call_. An absent or unrecognised value renders the same warning rather than silence, because assuming an address was verified is the expensive mistake. On a courier order `np_directory` covers the city only — the street is always typed by hand — and the rendered line says so.
 
@@ -126,7 +125,7 @@ A retry is suppressed only when _all four_ of these hold: the content hash match
 - **Suppressed:** the same order re-POSTed under the same key within half an hour of a confirmed delivery. The relay answers the byte-identical `200` and never calls Telegram.
 - **Not suppressed:** an order whose cart or total changed, even under the same key — this is the whole reason identity is the hash.
 - **Not suppressed:** a retry after an _ambiguous_ outcome (Telegram accepted but the acknowledgement was unreadable, or the call timed out). An unconfirmed send is not a delivery. A duplicate message is something the operators reconcile in a phone call; an order silently swallowed is not.
-- **Not suppressed:** anything older than the window, anything without a key on both sides, and every v1 order — v1 carries no key at all, so v1 traffic is recorded but never deduplicated.
+- **Not suppressed:** anything older than the window, and anything without a key on both sides — `idempotency_key` is optional, and a keyless order is recorded but never deduplicated.
 - **Not suppressed:** two identical requests racing each other. Both may find no prior and both may send. This is a bounded, accepted non-goal — locking would trade a duplicate message for a possibly lost order, which is the wrong direction.
 
 Every condition errs toward sending, because the two mistakes are not equally expensive.
@@ -162,6 +161,8 @@ Note what the conditions exclude, and why the exclusion is written the awkward w
 
 Two limits worth knowing. A serialized order over 262 144 characters is **not** stored: the relay logs `payload_too_large` and carries on, because a store that can refuse an order is worse than a store with a gap in it. And a row written late — the recovery path where the pre-send insert never landed and the post-send mark inserts the whole row instead — stamps `received_at` at mark time rather than receipt time, so its dedupe window can run up to about fifteen seconds long. Both are deliberate.
 
+**A replayed row cannot be POSTed back as-is.** `payload` holds the decoded envelope — `{"kind":"v2","payload":{…}}` — not the wire body the shop sent, so it carries no top-level `version` and the relay would refuse it with `version_unsupported`. To replay an order, unwrap the inner `payload` object and stamp `"version": 2` back onto it. The wrapper is stored on purpose: it is what makes a future envelope version distinguishable in rows written today.
+
 `payload` is `text`, not `jsonb`, deliberately. Postgres `jsonb` rejects two things the decoders accept and the shop can send: a NUL character and an unpaired surrogate. Under `jsonb` those orders would relay fine and then be silently dropped by the store — precisely the hostile inputs worth having a record of. `text` always accepts them.
 
 One consequence to know before you reach for it: a `payload::jsonb` cast is **not** a safe ad-hoc tool here. Postgres aborts the whole statement on the first value it cannot convert, so a single row a buyer planted weeks ago takes down the entire result set, not just its own row. The replay queries above return `payload` as text and are unaffected. If you do need to look inside, filter to the rows you want first and expect the cast to fail on some of them.
@@ -187,12 +188,14 @@ There is deliberately no local `.env` and no `.env.example` holding real values 
 
 ```bash
 npm install
-npm run typecheck     # tsc --noEmit
+npm run typecheck     # both TS programs: the deployed function and the tests
 npm test              # vitest; the Telegram API is stubbed wherever it is called
 npm run smoke         # compile per-file and load the entrypoint under real ESM rules
 npm run format        # prettier --write .
 npm run format:check  # what CI runs
 ```
+
+The deployed function and the test tree compile as two separate TypeScript programs — `tsconfig.json` covers `api/` and `src/`, `tsconfig.test.json` covers `tests/` and the vitest config — so nothing test-only can reach the type world of the code that ships.
 
 Node is pinned to `24.x` through `engines.node`: Vercel reads it for the runtime and CI reads it via `node-version-file`, so there is one pin rather than three (npm only warns about it unless `engine-strict` is set). Tests never reach the network — the Telegram API is stubbed wherever it is called, and nothing in this repository may POST to the deployed relay.
 

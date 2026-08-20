@@ -1,9 +1,9 @@
-import type { OrderCartItem } from "../../src/payload.js";
+import type { OrderCartItem } from "../../src/decode.js";
 import type {
   OrderCustomer,
   OrderEnvelope,
-  OrderPayloadV2,
-} from "../../src/payloadV2.js";
+  OrderPayload,
+} from "../../src/payload.js";
 
 export const PINNED_KEY = "3f2b8c1e-9a44-4d7e-8b2f-16c0a9e5d731";
 
@@ -30,9 +30,7 @@ const buildCustomer = (
   ...overrides,
 });
 
-const buildPayloadV2 = (
-  overrides: Partial<OrderPayloadV2> = {}
-): OrderPayloadV2 => ({
+const buildPayload = (overrides: Partial<OrderPayload> = {}): OrderPayload => ({
   customer: buildCustomer(),
   delivery: {
     mode: "np_branch",
@@ -50,29 +48,11 @@ const buildPayloadV2 = (
   ...overrides,
 });
 
-export const buildEnvelopeV2 = (
-  overrides: Partial<OrderPayloadV2> = {}
+export const buildEnvelope = (
+  overrides: Partial<OrderPayload> = {}
 ): OrderEnvelope => ({
   kind: "v2",
-  payload: buildPayloadV2(overrides),
+  payload: buildPayload(overrides),
 });
 
-export const buildEnvelopeV1 = (): OrderEnvelope => ({
-  kind: "v1",
-  payload: {
-    first_name: "Олександр",
-    last_name: "Петренко",
-    telephone: "+380671234567",
-    country: "Україна",
-    state: "Київська область",
-    city: "Київ",
-    address: "вул. Шевченка, 12, кв. 5",
-    additional: "",
-    locale: "uk",
-    total: "46200.00",
-    currency: "UAH",
-    cart: [buildCartLine()],
-  },
-});
-
-export const PINNED_ENVELOPE: OrderEnvelope = buildEnvelopeV2();
+export const PINNED_ENVELOPE: OrderEnvelope = buildEnvelope();

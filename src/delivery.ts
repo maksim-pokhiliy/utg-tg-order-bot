@@ -1,9 +1,4 @@
-import {
-  isRecord,
-  readOptionalText,
-  readText,
-  type RejectReason,
-} from "./payload.js";
+import { isRecord, readText, type RejectReason } from "./decode.js";
 
 const DELIVERY_MODES = [
   "np_branch",
@@ -52,15 +47,6 @@ const isDeliveryMode = (value: unknown): value is DeliveryMode =>
   typeof value === "string" &&
   DELIVERY_MODES.some((candidate) => candidate === value);
 
-const styleText = (
-  input: Record<string, unknown>,
-  key: string
-): string | undefined => {
-  const text = readOptionalText(input, key);
-
-  return text.ok ? text.value : undefined;
-};
-
 const numberedText = (
   input: Record<string, unknown>,
   key: string
@@ -73,13 +59,13 @@ const numberedText = (
       : undefined;
   }
 
-  return styleText(input, key);
+  return readText(input, key);
 };
 
 const readSource = (
   input: Record<string, unknown>
 ): DeliverySource | undefined => {
-  const text = styleText(input, "source");
+  const text = readText(input, "source");
 
   return DELIVERY_SOURCES.find((candidate) => candidate === text);
 };
@@ -157,8 +143,8 @@ const readGeneric = (
 
   return {
     mode: "generic",
-    country: styleText(input, "country"),
-    state: styleText(input, "state"),
+    country: readText(input, "country"),
+    state: readText(input, "state"),
     city,
     address,
   };

@@ -5,22 +5,22 @@ import type {
   DeliveryWarehouse,
   OrderDelivery,
 } from "../../src/delivery.js";
-import type { OrderCartItem, OrderPayload } from "../../src/payload.js";
-import type { OrderCustomer, OrderPayloadV2 } from "../../src/payloadV2.js";
+import type { OrderCartItem } from "../../src/decode.js";
+import type { OrderCustomer, OrderPayload } from "../../src/payload.js";
 
-export type Saturated<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
+type Saturated<T> = { [K in keyof T]-?: Exclude<T[K], undefined> };
 
 const ASTRAL = "🎯";
 const FILLER = ASTRAL.repeat(1000);
 const SATURATED_CART_SIZE = 40;
 
-export const saturatedCartItem = (index: number): Saturated<OrderCartItem> => ({
+const saturatedCartItem = (index: number): Saturated<OrderCartItem> => ({
   title: `${String(index)}${FILLER}`,
   quantity: 100000,
   productUrl: `https://s.test/${FILLER}`,
 });
 
-export const saturatedCart: readonly OrderCartItem[] = Array.from(
+const saturatedCart: readonly OrderCartItem[] = Array.from(
   { length: SATURATED_CART_SIZE },
   (_, index) => saturatedCartItem(index)
 );
@@ -69,9 +69,9 @@ export const SATURATED_DELIVERIES: Readonly<
   generic: saturatedGeneric,
 };
 
-export const saturatedPayloadV2 = (
+export const saturatedPayload = (
   delivery: OrderDelivery
-): Saturated<OrderPayloadV2> => ({
+): Saturated<OrderPayload> => ({
   customer: saturatedCustomer,
   delivery,
   comment: FILLER,
@@ -81,18 +81,3 @@ export const saturatedPayloadV2 = (
   currency: "UAH",
   cart: saturatedCart,
 });
-
-export const saturatedPayloadV1: Saturated<OrderPayload> = {
-  first_name: FILLER,
-  last_name: FILLER,
-  telephone: FILLER,
-  country: FILLER,
-  state: FILLER,
-  city: FILLER,
-  address: FILLER,
-  additional: FILLER,
-  locale: "uk",
-  total: "99999999999999999999",
-  currency: "UAH",
-  cart: saturatedCart,
-};

@@ -1,16 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { renderOrder } from "../src/messageV2.js";
-import { parseOrder } from "../src/payloadV2.js";
+import { renderOrder } from "../src/message.js";
+import { parseOrder } from "../src/payload.js";
 import {
   buildCartItem,
-  buildCustomerV2,
+  buildCustomer,
   buildDeliveryBranch,
   buildDeliveryCourier,
   buildDeliveryGeneric,
   buildDeliveryPostomat,
   buildOrder,
-  buildOrderV2,
 } from "./support/orderPayload.js";
 
 const RLO = "‮";
@@ -83,15 +82,32 @@ const lineOf = (message: string, label: string): string => {
   return line;
 };
 
-const V1_FIELDS: readonly FieldProbe[] = [
-  { name: "first_name", build: (value) => buildOrder({ first_name: value }) },
-  { name: "last_name", build: (value) => buildOrder({ last_name: value }) },
-  { name: "telephone", build: (value) => buildOrder({ telephone: value }) },
-  { name: "country", build: (value) => buildOrder({ country: value }) },
-  { name: "state", build: (value) => buildOrder({ state: value }) },
-  { name: "city", build: (value) => buildOrder({ city: value }) },
-  { name: "address", build: (value) => buildOrder({ address: value }) },
-  { name: "additional", build: (value) => buildOrder({ additional: value }) },
+const USER_FIELDS: readonly FieldProbe[] = [
+  {
+    name: "customer.first_name",
+    build: (value) =>
+      buildOrder({ customer: buildCustomer({ first_name: value }) }),
+  },
+  {
+    name: "customer.last_name",
+    build: (value) =>
+      buildOrder({ customer: buildCustomer({ last_name: value }) }),
+  },
+  {
+    name: "customer.patronymic",
+    build: (value) =>
+      buildOrder({ customer: buildCustomer({ patronymic: value }) }),
+  },
+  {
+    name: "customer.phone",
+    build: (value) => buildOrder({ customer: buildCustomer({ phone: value }) }),
+  },
+  {
+    name: "customer.contact_channel",
+    build: (value) =>
+      buildOrder({ customer: buildCustomer({ contact_channel: value }) }),
+  },
+  { name: "comment", build: (value) => buildOrder({ comment: value }) },
   {
     name: "cart title",
     build: (value) => buildOrder({ cart: [buildCartItem({ title: value })] }),
@@ -101,105 +117,67 @@ const V1_FIELDS: readonly FieldProbe[] = [
     build: (value) =>
       buildOrder({ cart: [buildCartItem({ productUrl: value })] }),
   },
-];
-
-const V2_FIELDS: readonly FieldProbe[] = [
-  {
-    name: "customer.first_name",
-    build: (value) =>
-      buildOrderV2({ customer: buildCustomerV2({ first_name: value }) }),
-  },
-  {
-    name: "customer.last_name",
-    build: (value) =>
-      buildOrderV2({ customer: buildCustomerV2({ last_name: value }) }),
-  },
-  {
-    name: "customer.patronymic",
-    build: (value) =>
-      buildOrderV2({ customer: buildCustomerV2({ patronymic: value }) }),
-  },
-  {
-    name: "customer.phone",
-    build: (value) =>
-      buildOrderV2({ customer: buildCustomerV2({ phone: value }) }),
-  },
-  {
-    name: "customer.contact_channel",
-    build: (value) =>
-      buildOrderV2({ customer: buildCustomerV2({ contact_channel: value }) }),
-  },
-  { name: "comment", build: (value) => buildOrderV2({ comment: value }) },
-  {
-    name: "cart title",
-    build: (value) => buildOrderV2({ cart: [buildCartItem({ title: value })] }),
-  },
-  {
-    name: "cart productUrl",
-    build: (value) =>
-      buildOrderV2({ cart: [buildCartItem({ productUrl: value })] }),
-  },
   {
     name: "np_branch city",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryBranch({ city: value }) }),
+      buildOrder({ delivery: buildDeliveryBranch({ city: value }) }),
   },
   {
     name: "np_branch warehouse",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryBranch({ warehouse: value }) }),
+      buildOrder({ delivery: buildDeliveryBranch({ warehouse: value }) }),
   },
   {
     name: "np_branch warehouse_number",
     build: (value) =>
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryBranch({ warehouse_number: value }),
       }),
   },
   {
     name: "np_postomat warehouse",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryPostomat({ warehouse: value }) }),
+      buildOrder({ delivery: buildDeliveryPostomat({ warehouse: value }) }),
   },
   {
     name: "np_courier city",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryCourier({ city: value }) }),
+      buildOrder({ delivery: buildDeliveryCourier({ city: value }) }),
   },
   {
     name: "np_courier street",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryCourier({ street: value }) }),
+      buildOrder({ delivery: buildDeliveryCourier({ street: value }) }),
   },
   {
     name: "np_courier building",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryCourier({ building: value }) }),
+      buildOrder({ delivery: buildDeliveryCourier({ building: value }) }),
   },
   {
     name: "np_courier apartment",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryCourier({ apartment: value }) }),
+      buildOrder({ delivery: buildDeliveryCourier({ apartment: value }) }),
   },
   {
     name: "generic country",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryGeneric({ country: value }) }),
+      buildOrder({ delivery: buildDeliveryGeneric({ country: value }) }),
   },
   {
     name: "generic state",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryGeneric({ state: value }) }),
+      buildOrder({ delivery: buildDeliveryGeneric({ state: value }) }),
   },
   {
     name: "generic city",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryGeneric({ city: value }) }),
+      buildOrder({ delivery: buildDeliveryGeneric({ city: value }) }),
   },
   {
     name: "generic address",
     build: (value) =>
-      buildOrderV2({ delivery: buildDeliveryGeneric({ address: value }) }),
+      buildOrder({ delivery: buildDeliveryGeneric({ address: value }) }),
   },
 ];
 
@@ -210,16 +188,8 @@ const expectNothingMisleadingSurvives = (message: string): void => {
   expect(message).toContain(SANITIZED_PROBE);
 };
 
-describe("every user-controlled v1 field is sanitized (BDEF-5)", () => {
-  for (const field of V1_FIELDS) {
-    it(`strips and folds misleading characters out of ${field.name}`, () => {
-      expectNothingMisleadingSurvives(render(field.build(HOSTILE_PROBE)));
-    });
-  }
-});
-
-describe("every user-controlled v2 field is sanitized (BDEF-5)", () => {
-  for (const field of V2_FIELDS) {
+describe("every user-controlled field is sanitized (BDEF-5)", () => {
+  for (const field of USER_FIELDS) {
     it(`strips and folds misleading characters out of ${field.name}`, () => {
       expectNothingMisleadingSurvives(render(field.build(HOSTILE_PROBE)));
     });
@@ -229,7 +199,7 @@ describe("every user-controlled v2 field is sanitized (BDEF-5)", () => {
 describe("the characters that were lying to the operator", () => {
   it("does not let an embedded RLO reverse a branch number", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryBranch({
           warehouse: `Відділення No. 4${RLO}3${POP_DIRECTIONAL}`,
         }),
@@ -243,7 +213,7 @@ describe("the characters that were lying to the operator", () => {
   it("folds math-bold so a comment cannot imitate a relay label", () => {
     const forgery =
       "\u{1D400}\u{1D41D}\u{1D41D}\u{1D42B}\u{1D41E}\u{1D42C}\u{1D42C} \u{1D412}\u{1D428}\u{1D42E}\u{1D42B}\u{1D41C}\u{1D41E}:";
-    const message = render(buildOrderV2({ comment: forgery }));
+    const message = render(buildOrder({ comment: forgery }));
 
     expect(message).toContain("Address Source:");
     expect(message).not.toMatch(MATH_ALPHANUMERIC);
@@ -251,25 +221,68 @@ describe("the characters that were lying to the operator", () => {
   });
 
   it("escapes markup that only exists after normalization", () => {
-    const message = render(buildOrder({ first_name: "＜b＞Bobby＜/b＞" }));
+    const message = render(
+      buildOrder({
+        customer: buildCustomer({ first_name: "＜b＞Bobby＜/b＞" }),
+      })
+    );
 
     expect(message).toContain("&lt;b&gt;Bobby&lt;/b&gt;");
     expect(message).not.toContain("<b>Bobby</b>");
   });
 
-  for (const [raw, escaped] of NORMALIZES_TO_MARKUP) {
-    it(`escapes ${JSON.stringify(raw)}, which normalization turns into markup`, () => {
-      const message = render(buildOrder({ first_name: `A${raw}B` }));
+  const MARKUP_CARRIERS: readonly FieldProbe[] = [
+    {
+      name: "customer.first_name",
+      build: (value) =>
+        buildOrder({ customer: buildCustomer({ first_name: value }) }),
+    },
+    { name: "comment", build: (value) => buildOrder({ comment: value }) },
+  ];
 
-      expect(lineOf(message, "👤 <b>First Name:</b>")).toBe(
-        `👤 <b>First Name:</b> A${escaped}B`
-      );
-    });
+  const LABEL_OF: Readonly<Record<string, string>> = {
+    "customer.first_name": "👤 <b>First Name:</b>",
+    comment: ADDITIONAL_LABEL,
+  };
+
+  for (const carrier of MARKUP_CARRIERS) {
+    for (const [raw, escaped] of NORMALIZES_TO_MARKUP) {
+      it(`escapes ${JSON.stringify(raw)} out of ${carrier.name}, which normalization turns into markup`, () => {
+        const label = LABEL_OF[carrier.name] ?? "";
+        const message = render(carrier.build(`A${raw}B`));
+
+        expect(lineOf(message, label)).toBe(`${label} A${escaped}B`);
+      });
+    }
   }
+
+  it("cannot be talked into a live anchor by a fullwidth comment", () => {
+    const message = render(
+      buildOrder({ comment: "＜a href=＂https://evil.test＂＞click＜/a＞" })
+    );
+
+    expect(message).not.toMatch(/<a\s/u);
+    expect(lineOf(message, ADDITIONAL_LABEL)).toBe(
+      `${ADDITIONAL_LABEL} &lt;a href="https://evil.test"&gt;click&lt;/a&gt;`
+    );
+  });
+
+  it("bounds the work before NFKC can multiply it", () => {
+    const before = process.memoryUsage().heapUsed;
+    const started = Date.now();
+
+    const message = render(buildOrder({ comment: "\uFDFA".repeat(4_000_000) }));
+
+    expect(Date.now() - started).toBeLessThan(250);
+    expect(process.memoryUsage().heapUsed - before).toBeLessThan(60_000_000);
+    expect(message.length).toBeLessThanOrEqual(4096);
+  });
 
   it("bounds the work before sanitizing, not after", () => {
     const beyondTheBound = `${ZERO_WIDTH_SPACE.repeat(2000)}Kyiv`;
-    const message = render(buildOrder({ city: beyondTheBound }));
+    const message = render(
+      buildOrder({ delivery: buildDeliveryGeneric({ city: beyondTheBound }) })
+    );
 
     expect(message).not.toContain("Kyiv");
     expect(lineOf(message, "🌍 <b>City:</b>")).toBe("🌍 <b>City:</b> ");
@@ -277,7 +290,11 @@ describe("the characters that were lying to the operator", () => {
 
   it("drops tag characters, which carry no visible glyph at all", () => {
     const message = render(
-      buildOrder({ city: `Київ${TAG_LETTER}${TAG_LETTER}` })
+      buildOrder({
+        delivery: buildDeliveryGeneric({
+          city: `Київ${TAG_LETTER}${TAG_LETTER}`,
+        }),
+      })
     );
 
     expect(message).toContain("🌍 <b>City:</b> Київ");
@@ -286,7 +303,7 @@ describe("the characters that were lying to the operator", () => {
 
   it("keeps a variation selector, which is a mark and not a format control", () => {
     const typed = `🏷${VARIATION_SELECTOR}`;
-    const message = render(buildOrder({ additional: typed }));
+    const message = render(buildOrder({ comment: typed }));
 
     expect(lineOf(message, ADDITIONAL_LABEL)).toBe(
       `${ADDITIONAL_LABEL} ${typed}`
@@ -295,7 +312,7 @@ describe("the characters that were lying to the operator", () => {
 
   it("splits a zwj sequence, because the joiner is a format character", () => {
     const family = `👨${ZERO_WIDTH_JOINER}👩${ZERO_WIDTH_JOINER}👧`;
-    const message = render(buildOrder({ additional: family }));
+    const message = render(buildOrder({ comment: family }));
 
     expect(lineOf(message, ADDITIONAL_LABEL)).toBe(
       `${ADDITIONAL_LABEL} 👨👩👧`
@@ -305,13 +322,15 @@ describe("the characters that were lying to the operator", () => {
 
   it("degrades a tag-sequence flag to its base flag", () => {
     const scotland = "🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}";
-    const message = render(buildOrder({ additional: scotland }));
+    const message = render(buildOrder({ comment: scotland }));
 
     expect(lineOf(message, ADDITIONAL_LABEL)).toBe(`${ADDITIONAL_LABEL} 🏴`);
   });
 
   it("still replaces the lone surrogates valid json can carry", () => {
-    const message = render(buildOrder({ city: "Ky\uD800iv" }));
+    const message = render(
+      buildOrder({ delivery: buildDeliveryGeneric({ city: "Ky\uD800iv" }) })
+    );
 
     expect(message).not.toMatch(/[\uD800-\uDFFF]/u);
     expect(message).toContain("Ky�iv");
@@ -321,7 +340,7 @@ describe("the characters that were lying to the operator", () => {
 describe("the fold the carrier directory will show the operator", () => {
   it("renders the numero sign nova poshta uses as No", () => {
     const message = render(
-      buildOrderV2({
+      buildOrder({
         delivery: buildDeliveryBranch({
           warehouse: "Відділення №1: вул. Городоцька, 359",
         }),
@@ -337,14 +356,6 @@ describe("the text the relay generates itself is never sanitized", () => {
   it("keeps the non-breaking spaces the uk money format puts in", () => {
     const message = render(
       buildOrder({ locale: "uk", currency: "UAH", total: "46200.00" })
-    );
-
-    expect(message).toContain("💲 <b>Total:</b> 46 200,00 ₴");
-  });
-
-  it("keeps them on the v2 path too", () => {
-    const message = render(
-      buildOrderV2({ locale: "uk", currency: "UAH", total: "46200.00" })
     );
 
     expect(message).toContain("💲 <b>Total:</b> 46 200,00 ₴");
