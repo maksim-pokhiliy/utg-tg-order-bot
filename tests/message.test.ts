@@ -441,6 +441,105 @@ describe("the label sequence the operator reads", () => {
   });
 });
 
+const LATIN = /\p{Script=Latin}/u;
+const MIN_RENDERED_LABELS = 12;
+const DELIVERY_MODE_COUNT = 4;
+const SOURCE_TEXT_COUNT = 4;
+const LABEL_DELIVERY = "🚚 <b>Доставка:</b>";
+const LABEL_CONTACT = "💬 <b>Спосіб зв’язку:</b>";
+
+const CONTACT_CHANNEL_TEXTS: readonly (readonly [string, string])[] = [
+  ["call", "Дзвінок"],
+  ["telegram", "Telegram"],
+  ["viber", "Viber"],
+];
+
+const SOURCE_SPREAD = [
+  buildDeliveryBranch({ source: "np_directory" }),
+  buildDeliveryBranch({ source: "manual" }),
+  buildDeliveryBranch({ source: undefined }),
+  buildDeliveryPostomat({ source: "np_directory" }),
+  buildDeliveryCourier({ source: "np_directory" }),
+  buildDeliveryGeneric(),
+];
+
+const lineValue = (message: string, label: string): string => {
+  const line = message.split("\n").find((entry) => entry.startsWith(label));
+
+  if (line === undefined) {
+    throw new Error(`no line labelled ${label}`);
+  }
+
+  return line.slice(label.length + 1);
+};
+
+const expectEveryLabelUkrainian = (message: string): void => {
+  const labels = labelsOf(message);
+
+  expect(labels.length).toBeGreaterThanOrEqual(MIN_RENDERED_LABELS);
+
+  for (const label of labels) {
+    expect(label).not.toMatch(LATIN);
+  }
+};
+
+describe("the alphabet the labels are written in", () => {
+  for (const { name, delivery } of CLEAN_DELIVERIES) {
+    it(`writes every label in ukrainian for ${name}`, () => {
+      expectEveryLabelUkrainian(render(buildOrder({ delivery })));
+    });
+  }
+
+  it("writes the omitted marker in ukrainian too", () => {
+    const message = render(
+      buildOrder({ comment: HUGE, cart: PATHOLOGICAL_CART })
+    );
+
+    expect(message).toContain("ще позицій:");
+    expectEveryLabelUkrainian(message);
+  });
+
+  it("names the delivery mode and the address source in ukrainian", () => {
+    const modes = new Set<string>();
+    const sources = new Set<string>();
+
+    for (const delivery of SOURCE_SPREAD) {
+      const message = render(buildOrder({ delivery }));
+      const mode = lineValue(message, LABEL_DELIVERY);
+      const source = lineValue(message, LABEL_SOURCE);
+
+      expect(mode).not.toMatch(LATIN);
+      expect(source).not.toMatch(LATIN);
+
+      modes.add(mode);
+      sources.add(source);
+    }
+
+    expect(modes.size).toBe(DELIVERY_MODE_COUNT);
+    expect(sources.size).toBe(SOURCE_TEXT_COUNT);
+  });
+});
+
+describe("the contact channel the operator reads", () => {
+  it("names every channel the shop can send", () => {
+    for (const [value, text] of CONTACT_CHANNEL_TEXTS) {
+      const message = render(
+        buildOrder({ customer: buildCustomer({ contact_channel: value }) })
+      );
+
+      expect(lineValue(message, LABEL_CONTACT)).toBe(text);
+    }
+  });
+
+  it("prints a channel nobody pinned exactly as it arrived", () => {
+    const message = render(
+      buildOrder({ customer: buildCustomer({ contact_channel: "signal" }) })
+    );
+
+    expect(lineValue(message, LABEL_CONTACT)).toBe("signal");
+  });
+});
+
 describe("the idempotency key", () => {
   it("never reaches the operator as a recognisable literal", () => {
     for (const delivery of CLEAN_DELIVERIES) {
