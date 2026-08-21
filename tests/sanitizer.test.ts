@@ -51,33 +51,33 @@ interface FieldProbe {
   build: (value: string) => Record<string, unknown>;
 }
 
-const ADDITIONAL_LABEL = "📄 <b>Additional Information:</b>";
-const WAREHOUSE_LABEL = "🏤 <b>Warehouse:</b>";
-const SOURCE_LABEL = "🔎 <b>Address Source:</b>";
+const ADDITIONAL_LABEL = "📄 <b>Коментар:</b>";
+const WAREHOUSE_LABEL = "🏤 <b>Відділення:</b>";
+const SOURCE_LABEL = "🔎 <b>Джерело адреси:</b>";
 
 const RELAY_LABELS: readonly string[] = [
-  "👤 <b>First Name:</b>",
-  "🧔 <b>Last Name:</b>",
-  "📛 <b>Patronymic:</b>",
-  "📞 <b>Telephone:</b>",
-  "💬 <b>Preferred Contact:</b>",
-  "🚚 <b>Delivery:</b>",
+  "👤 <b>Ім’я:</b>",
+  "🧔 <b>Прізвище:</b>",
+  "📛 <b>По батькові:</b>",
+  "📞 <b>Телефон:</b>",
+  "💬 <b>Спосіб зв’язку:</b>",
+  "🚚 <b>Доставка:</b>",
   SOURCE_LABEL,
-  "🌍 <b>Country:</b>",
-  "🌍 <b>State:</b>",
-  "🌍 <b>City:</b>",
-  "🏠 <b>Address:</b>",
-  "🛣️ <b>Street:</b>",
-  "🏠 <b>Building:</b>",
-  "🚪 <b>Apartment:</b>",
+  "🌍 <b>Країна:</b>",
+  "🌍 <b>Область:</b>",
+  "🌍 <b>Місто:</b>",
+  "🏠 <b>Адреса:</b>",
+  "🛣️ <b>Вулиця:</b>",
+  "🏠 <b>Будинок:</b>",
+  "🚪 <b>Квартира:</b>",
   WAREHOUSE_LABEL,
-  "🔢 <b>Warehouse No:</b>",
-  "💲 <b>Total:</b>",
+  "🔢 <b>Відділення №:</b>",
+  "💲 <b>Сума:</b>",
   ADDITIONAL_LABEL,
-  "🛒 <b>Products:</b>",
-  "🏷️ <b>Title:</b>",
-  "🔢 <b>Quantity:</b>",
-  "🔗 <b>Product URL:</b>",
+  "🛒 <b>Товари:</b>",
+  "🏷️ <b>Назва:</b>",
+  "🔢 <b>Кількість:</b>",
+  "🔗 <b>Посилання:</b>",
 ];
 
 const NORMALIZES_TO_MARKUP: readonly (readonly [string, string])[] = [
@@ -276,7 +276,7 @@ describe("the characters that were lying to the operator", () => {
   ];
 
   const LABEL_OF: Readonly<Record<string, string>> = {
-    "customer.first_name": "👤 <b>First Name:</b>",
+    "customer.first_name": "👤 <b>Ім’я:</b>",
     comment: ADDITIONAL_LABEL,
   };
 
@@ -320,7 +320,7 @@ describe("the characters that were lying to the operator", () => {
     );
 
     expect(message).not.toContain("Kyiv");
-    expect(lineOf(message, "🌍 <b>City:</b>")).toBe("🌍 <b>City:</b> ");
+    expect(lineOf(message, "🌍 <b>Місто:</b>")).toBe("🌍 <b>Місто:</b> ");
   });
 
   it("drops tag characters, which carry no visible glyph at all", () => {
@@ -332,7 +332,7 @@ describe("the characters that were lying to the operator", () => {
       })
     );
 
-    expect(message).toContain("🌍 <b>City:</b> Київ");
+    expect(message).toContain("🌍 <b>Місто:</b> Київ");
     expect(message).not.toMatch(FORMAT_CONTROL);
   });
 
@@ -393,7 +393,7 @@ describe("the text the relay generates itself is never sanitized", () => {
       buildOrder({ locale: "uk", currency: "UAH", total: "46200.00" })
     );
 
-    expect(message).toContain("💲 <b>Total:</b> 46 200,00 ₴");
+    expect(message).toContain("💲 <b>Сума:</b> 46 200,00 ₴");
   });
 });
 

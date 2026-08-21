@@ -20,29 +20,29 @@ const PATHOLOGICAL_CART_SIZE = 5;
 const MIN_SURVIVING_ITEM_BLOCKS = 3;
 const REALISTIC_CART_SIZE = 25;
 
-const LABEL_SOURCE = "🔎 <b>Address Source:</b>";
-const LABEL_WAREHOUSE = "🏤 <b>Warehouse:</b>";
-const LABEL_WAREHOUSE_NUMBER = "🔢 <b>Warehouse No:</b>";
-const LABEL_STREET = "🛣️ <b>Street:</b>";
-const LABEL_BUILDING = "🏠 <b>Building:</b>";
-const LABEL_APARTMENT = "🚪 <b>Apartment:</b>";
-const LABEL_COUNTRY = "🌍 <b>Country:</b>";
-const LABEL_STATE = "🌍 <b>State:</b>";
-const LABEL_ADDRESS = "🏠 <b>Address:</b>";
-const LABEL_TITLE = "🏷️ <b>Title:</b>";
-const LABEL_TOTAL = "💲 <b>Total:</b>";
-const LABEL_TELEPHONE = "📞 <b>Telephone:</b>";
-const LABEL_PRODUCTS = "🛒 <b>Products:</b>";
+const LABEL_SOURCE = "🔎 <b>Джерело адреси:</b>";
+const LABEL_WAREHOUSE = "🏤 <b>Відділення:</b>";
+const LABEL_WAREHOUSE_NUMBER = "🔢 <b>Відділення №:</b>";
+const LABEL_STREET = "🛣️ <b>Вулиця:</b>";
+const LABEL_BUILDING = "🏠 <b>Будинок:</b>";
+const LABEL_APARTMENT = "🚪 <b>Квартира:</b>";
+const LABEL_COUNTRY = "🌍 <b>Країна:</b>";
+const LABEL_STATE = "🌍 <b>Область:</b>";
+const LABEL_ADDRESS = "🏠 <b>Адреса:</b>";
+const LABEL_TITLE = "🏷️ <b>Назва:</b>";
+const LABEL_TOTAL = "💲 <b>Сума:</b>";
+const LABEL_TELEPHONE = "📞 <b>Телефон:</b>";
+const LABEL_PRODUCTS = "🛒 <b>Товари:</b>";
 
 const WAREHOUSE_LABELS = [LABEL_WAREHOUSE, LABEL_WAREHOUSE_NUMBER];
 const COURIER_LABELS = [LABEL_STREET, LABEL_BUILDING, LABEL_APARTMENT];
 const GENERIC_LABELS = [LABEL_COUNTRY, LABEL_STATE, LABEL_ADDRESS];
 
-const SOURCE_DIRECTORY = "Nova Poshta directory";
+const SOURCE_DIRECTORY = "Довідник Нової Пошти";
 const SOURCE_DIRECTORY_COURIER =
-  "Nova Poshta directory (city only — verify the street on the call)";
-const SOURCE_MANUAL = "typed by hand — verify on the call";
-const SOURCE_UNSTATED = "not stated — verify on the call";
+  "Довідник Нової Пошти (лише місто — вулицю уточніть у дзвінку)";
+const SOURCE_MANUAL = "введено вручну — уточніть у дзвінку";
+const SOURCE_UNSTATED = "не вказано — уточніть у дзвінку";
 
 const HUGE = "ф".repeat(PATHOLOGICAL_LENGTH);
 
@@ -92,106 +92,106 @@ const buildDistinctOrder = (
   });
 
 const BRANCH_GOLDEN = [
-  "👤 <b>First Name:</b> FirstNameValue",
-  "🧔 <b>Last Name:</b> LastNameValue",
-  "📛 <b>Patronymic:</b> PatronymicValue",
-  "📞 <b>Telephone:</b> PhoneValue",
-  "💬 <b>Preferred Contact:</b> ContactChannelValue",
-  "🚚 <b>Delivery:</b> Nova Poshta branch",
-  "🔎 <b>Address Source:</b> Nova Poshta directory",
-  "🌍 <b>City:</b> CityValue",
-  "🏤 <b>Warehouse:</b> WarehouseValue",
-  "🔢 <b>Warehouse No:</b> WarehouseNumberValue",
-  "💲 <b>Total:</b> $1,234.50",
-  "📄 <b>Additional Information:</b> CommentValue",
+  "👤 <b>Ім’я:</b> FirstNameValue",
+  "🧔 <b>Прізвище:</b> LastNameValue",
+  "📛 <b>По батькові:</b> PatronymicValue",
+  "📞 <b>Телефон:</b> PhoneValue",
+  "💬 <b>Спосіб зв’язку:</b> ContactChannelValue",
+  "🚚 <b>Доставка:</b> Відділення Нової Пошти",
+  "🔎 <b>Джерело адреси:</b> Довідник Нової Пошти",
+  "🌍 <b>Місто:</b> CityValue",
+  "🏤 <b>Відділення:</b> WarehouseValue",
+  "🔢 <b>Відділення №:</b> WarehouseNumberValue",
+  "💲 <b>Сума:</b> $1,234.50",
+  "📄 <b>Коментар:</b> CommentValue",
   "",
-  "🛒 <b>Products:</b>",
+  "🛒 <b>Товари:</b>",
   "",
-  " 🏷️ <b>Title:</b> TitleValue",
-  "🔢 <b>Quantity:</b> 7",
-  "🔗 <b>Product URL:</b> ProductUrlValue",
+  " 🏷️ <b>Назва:</b> TitleValue",
+  "🔢 <b>Кількість:</b> 7",
+  "🔗 <b>Посилання:</b> ProductUrlValue",
 ].join("\n");
 
 const POSTOMAT_GOLDEN = [
-  "👤 <b>First Name:</b> FirstNameValue",
-  "🧔 <b>Last Name:</b> LastNameValue",
-  "📛 <b>Patronymic:</b> PatronymicValue",
-  "📞 <b>Telephone:</b> PhoneValue",
-  "💬 <b>Preferred Contact:</b> ContactChannelValue",
-  "🚚 <b>Delivery:</b> Nova Poshta parcel locker",
-  "🔎 <b>Address Source:</b> typed by hand — verify on the call",
-  "🌍 <b>City:</b> CityValue",
-  "🏤 <b>Warehouse:</b> WarehouseValue",
-  "🔢 <b>Warehouse No:</b> WarehouseNumberValue",
-  "💲 <b>Total:</b> $1,234.50",
-  "📄 <b>Additional Information:</b> CommentValue",
+  "👤 <b>Ім’я:</b> FirstNameValue",
+  "🧔 <b>Прізвище:</b> LastNameValue",
+  "📛 <b>По батькові:</b> PatronymicValue",
+  "📞 <b>Телефон:</b> PhoneValue",
+  "💬 <b>Спосіб зв’язку:</b> ContactChannelValue",
+  "🚚 <b>Доставка:</b> Поштомат Нової Пошти",
+  "🔎 <b>Джерело адреси:</b> введено вручну — уточніть у дзвінку",
+  "🌍 <b>Місто:</b> CityValue",
+  "🏤 <b>Відділення:</b> WarehouseValue",
+  "🔢 <b>Відділення №:</b> WarehouseNumberValue",
+  "💲 <b>Сума:</b> $1,234.50",
+  "📄 <b>Коментар:</b> CommentValue",
   "",
-  "🛒 <b>Products:</b>",
+  "🛒 <b>Товари:</b>",
   "",
-  " 🏷️ <b>Title:</b> TitleValue",
-  "🔢 <b>Quantity:</b> 7",
-  "🔗 <b>Product URL:</b> ProductUrlValue",
+  " 🏷️ <b>Назва:</b> TitleValue",
+  "🔢 <b>Кількість:</b> 7",
+  "🔗 <b>Посилання:</b> ProductUrlValue",
 ].join("\n");
 
 const COURIER_GOLDEN = [
-  "👤 <b>First Name:</b> FirstNameValue",
-  "🧔 <b>Last Name:</b> LastNameValue",
-  "📛 <b>Patronymic:</b> PatronymicValue",
-  "📞 <b>Telephone:</b> PhoneValue",
-  "💬 <b>Preferred Contact:</b> ContactChannelValue",
-  "🚚 <b>Delivery:</b> Nova Poshta courier",
-  "🔎 <b>Address Source:</b> Nova Poshta directory (city only — verify the street on the call)",
-  "🌍 <b>City:</b> CityValue",
-  "🛣️ <b>Street:</b> StreetValue",
-  "🏠 <b>Building:</b> BuildingValue",
-  "🚪 <b>Apartment:</b> ApartmentValue",
-  "💲 <b>Total:</b> $1,234.50",
-  "📄 <b>Additional Information:</b> CommentValue",
+  "👤 <b>Ім’я:</b> FirstNameValue",
+  "🧔 <b>Прізвище:</b> LastNameValue",
+  "📛 <b>По батькові:</b> PatronymicValue",
+  "📞 <b>Телефон:</b> PhoneValue",
+  "💬 <b>Спосіб зв’язку:</b> ContactChannelValue",
+  "🚚 <b>Доставка:</b> Кур’єр Нової Пошти",
+  "🔎 <b>Джерело адреси:</b> Довідник Нової Пошти (лише місто — вулицю уточніть у дзвінку)",
+  "🌍 <b>Місто:</b> CityValue",
+  "🛣️ <b>Вулиця:</b> StreetValue",
+  "🏠 <b>Будинок:</b> BuildingValue",
+  "🚪 <b>Квартира:</b> ApartmentValue",
+  "💲 <b>Сума:</b> $1,234.50",
+  "📄 <b>Коментар:</b> CommentValue",
   "",
-  "🛒 <b>Products:</b>",
+  "🛒 <b>Товари:</b>",
   "",
-  " 🏷️ <b>Title:</b> TitleValue",
-  "🔢 <b>Quantity:</b> 7",
-  "🔗 <b>Product URL:</b> ProductUrlValue",
+  " 🏷️ <b>Назва:</b> TitleValue",
+  "🔢 <b>Кількість:</b> 7",
+  "🔗 <b>Посилання:</b> ProductUrlValue",
 ].join("\n");
 
 const GENERIC_GOLDEN = [
-  "👤 <b>First Name:</b> FirstNameValue",
-  "🧔 <b>Last Name:</b> LastNameValue",
-  "📛 <b>Patronymic:</b> PatronymicValue",
-  "📞 <b>Telephone:</b> PhoneValue",
-  "💬 <b>Preferred Contact:</b> ContactChannelValue",
-  "🚚 <b>Delivery:</b> Free-form address",
-  "🔎 <b>Address Source:</b> typed by hand — verify on the call",
-  "🌍 <b>Country:</b> CountryValue",
-  "🌍 <b>State:</b> StateValue",
-  "🌍 <b>City:</b> CityValue",
-  "🏠 <b>Address:</b> AddressValue",
-  "💲 <b>Total:</b> $1,234.50",
-  "📄 <b>Additional Information:</b> CommentValue",
+  "👤 <b>Ім’я:</b> FirstNameValue",
+  "🧔 <b>Прізвище:</b> LastNameValue",
+  "📛 <b>По батькові:</b> PatronymicValue",
+  "📞 <b>Телефон:</b> PhoneValue",
+  "💬 <b>Спосіб зв’язку:</b> ContactChannelValue",
+  "🚚 <b>Доставка:</b> Довільна адреса",
+  "🔎 <b>Джерело адреси:</b> введено вручну — уточніть у дзвінку",
+  "🌍 <b>Країна:</b> CountryValue",
+  "🌍 <b>Область:</b> StateValue",
+  "🌍 <b>Місто:</b> CityValue",
+  "🏠 <b>Адреса:</b> AddressValue",
+  "💲 <b>Сума:</b> $1,234.50",
+  "📄 <b>Коментар:</b> CommentValue",
   "",
-  "🛒 <b>Products:</b>",
+  "🛒 <b>Товари:</b>",
   "",
-  " 🏷️ <b>Title:</b> TitleValue",
-  "🔢 <b>Quantity:</b> 7",
-  "🔗 <b>Product URL:</b> ProductUrlValue",
+  " 🏷️ <b>Назва:</b> TitleValue",
+  "🔢 <b>Кількість:</b> 7",
+  "🔗 <b>Посилання:</b> ProductUrlValue",
 ].join("\n");
 
 const BARE_GOLDEN = [
-  "👤 <b>First Name:</b> FirstNameValue",
-  "🧔 <b>Last Name:</b> LastNameValue",
-  "📞 <b>Telephone:</b> PhoneValue",
-  "🚚 <b>Delivery:</b> Nova Poshta branch",
-  "🔎 <b>Address Source:</b> not stated — verify on the call",
-  "🌍 <b>City:</b> CityValue",
-  "🏤 <b>Warehouse:</b> WarehouseValue",
-  "💲 <b>Total:</b> $1,234.50",
+  "👤 <b>Ім’я:</b> FirstNameValue",
+  "🧔 <b>Прізвище:</b> LastNameValue",
+  "📞 <b>Телефон:</b> PhoneValue",
+  "🚚 <b>Доставка:</b> Відділення Нової Пошти",
+  "🔎 <b>Джерело адреси:</b> не вказано — уточніть у дзвінку",
+  "🌍 <b>Місто:</b> CityValue",
+  "🏤 <b>Відділення:</b> WarehouseValue",
+  "💲 <b>Сума:</b> $1,234.50",
   "",
-  "🛒 <b>Products:</b>",
+  "🛒 <b>Товари:</b>",
   "",
-  " 🏷️ <b>Title:</b> TitleValue",
-  "🔢 <b>Quantity:</b> 7",
-  "🔗 <b>Product URL:</b> ProductUrlValue",
+  " 🏷️ <b>Назва:</b> TitleValue",
+  "🔢 <b>Кількість:</b> 7",
+  "🔗 <b>Посилання:</b> ProductUrlValue",
 ].join("\n");
 
 const BARE_ORDER = buildOrder({
@@ -357,62 +357,62 @@ const labelsOf = (message: string): readonly string[] =>
   [...message.matchAll(BOLD_RUN)].map((match) => match[1] ?? "");
 
 const BRANCH_LABEL_SEQUENCE: readonly string[] = [
-  "First Name:",
-  "Last Name:",
-  "Patronymic:",
-  "Telephone:",
-  "Preferred Contact:",
-  "Delivery:",
-  "Address Source:",
-  "City:",
-  "Warehouse:",
-  "Warehouse No:",
-  "Total:",
-  "Additional Information:",
-  "Products:",
-  "Title:",
-  "Quantity:",
-  "Product URL:",
+  "Ім’я:",
+  "Прізвище:",
+  "По батькові:",
+  "Телефон:",
+  "Спосіб зв’язку:",
+  "Доставка:",
+  "Джерело адреси:",
+  "Місто:",
+  "Відділення:",
+  "Відділення №:",
+  "Сума:",
+  "Коментар:",
+  "Товари:",
+  "Назва:",
+  "Кількість:",
+  "Посилання:",
 ];
 
 const COURIER_LABEL_SEQUENCE: readonly string[] = [
-  "First Name:",
-  "Last Name:",
-  "Patronymic:",
-  "Telephone:",
-  "Preferred Contact:",
-  "Delivery:",
-  "Address Source:",
-  "City:",
-  "Street:",
-  "Building:",
-  "Apartment:",
-  "Total:",
-  "Additional Information:",
-  "Products:",
-  "Title:",
-  "Quantity:",
-  "Product URL:",
+  "Ім’я:",
+  "Прізвище:",
+  "По батькові:",
+  "Телефон:",
+  "Спосіб зв’язку:",
+  "Доставка:",
+  "Джерело адреси:",
+  "Місто:",
+  "Вулиця:",
+  "Будинок:",
+  "Квартира:",
+  "Сума:",
+  "Коментар:",
+  "Товари:",
+  "Назва:",
+  "Кількість:",
+  "Посилання:",
 ];
 
 const GENERIC_LABEL_SEQUENCE: readonly string[] = [
-  "First Name:",
-  "Last Name:",
-  "Patronymic:",
-  "Telephone:",
-  "Preferred Contact:",
-  "Delivery:",
-  "Address Source:",
-  "Country:",
-  "State:",
-  "City:",
-  "Address:",
-  "Total:",
-  "Additional Information:",
-  "Products:",
-  "Title:",
-  "Quantity:",
-  "Product URL:",
+  "Ім’я:",
+  "Прізвище:",
+  "По батькові:",
+  "Телефон:",
+  "Спосіб зв’язку:",
+  "Доставка:",
+  "Джерело адреси:",
+  "Країна:",
+  "Область:",
+  "Місто:",
+  "Адреса:",
+  "Сума:",
+  "Коментар:",
+  "Товари:",
+  "Назва:",
+  "Кількість:",
+  "Посилання:",
 ];
 
 describe("the label sequence the operator reads", () => {
@@ -469,7 +469,7 @@ describe("the delivery blocks", () => {
   it("renders the warehouse lines for a branch and no other mode's lines", () => {
     const message = render(buildOrder({ delivery: buildDeliveryBranch() }));
 
-    expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta branch");
+    expect(message).toContain("🚚 <b>Доставка:</b> Відділення Нової Пошти");
     expect(message).toContain(
       `${LABEL_WAREHOUSE} Відділення No1: вул. Городоцька, 359`
     );
@@ -483,7 +483,7 @@ describe("the delivery blocks", () => {
   it("renders the warehouse lines for a parcel locker and no other mode's lines", () => {
     const message = render(buildOrder({ delivery: buildDeliveryPostomat() }));
 
-    expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta parcel locker");
+    expect(message).toContain("🚚 <b>Доставка:</b> Поштомат Нової Пошти");
     expect(message).toContain(
       `${LABEL_WAREHOUSE} Поштомат No12345: вул. Стрийська, 30, магазин «АТБ»`
     );
@@ -497,7 +497,7 @@ describe("the delivery blocks", () => {
   it("renders the street lines for a courier and no other mode's lines", () => {
     const message = render(buildOrder({ delivery: buildDeliveryCourier() }));
 
-    expect(message).toContain("🚚 <b>Delivery:</b> Nova Poshta courier");
+    expect(message).toContain("🚚 <b>Доставка:</b> Кур’єр Нової Пошти");
     expect(message).toContain(`${LABEL_STREET} вул. Городоцька`);
     expect(message).toContain(`${LABEL_BUILDING} 359`);
     expect(message).toContain(`${LABEL_APARTMENT} 12`);
@@ -510,7 +510,7 @@ describe("the delivery blocks", () => {
   it("renders the country lines for a free-form address and no other mode's lines", () => {
     const message = render(buildOrder({ delivery: buildDeliveryGeneric() }));
 
-    expect(message).toContain("🚚 <b>Delivery:</b> Free-form address");
+    expect(message).toContain("🚚 <b>Доставка:</b> Довільна адреса");
     expect(message).toContain(`${LABEL_COUNTRY} Poland`);
     expect(message).toContain(`${LABEL_STATE} Lesser Poland`);
     expect(message).toContain(`${LABEL_ADDRESS} ul. Floriańska 3/5`);
@@ -598,7 +598,7 @@ describe("the address source line", () => {
     expect(sourceLineOf(message)).toBe(`${LABEL_SOURCE} ${SOURCE_UNSTATED}`);
   });
 
-  it("falls back to not stated when the source string is unrecognised", () => {
+  it("falls back to the unstated warning when the source string is unrecognised", () => {
     const message = render(
       buildOrder({
         delivery: buildDeliveryBranch({ source: "google_maps" }),
@@ -617,7 +617,7 @@ describe("escaping and forgery resistance", () => {
     );
 
     expect(message).toContain(
-      "🏷️ <b>Title:</b> &lt;b&gt;Patch&lt;/b&gt; &amp; co"
+      "🏷️ <b>Назва:</b> &lt;b&gt;Patch&lt;/b&gt; &amp; co"
     );
     expect(message).not.toContain("<b>Patch</b>");
   });
@@ -632,7 +632,7 @@ describe("escaping and forgery resistance", () => {
     );
 
     expect(message).toContain(
-      "🔗 <b>Product URL:</b> https://shop.test/p?a=1&amp;b=2&amp;utm=&lt;x&gt;"
+      "🔗 <b>Посилання:</b> https://shop.test/p?a=1&amp;b=2&amp;utm=&lt;x&gt;"
     );
     expect(message).not.toMatch(/&(?!amp;|lt;|gt;)/);
   });
@@ -641,7 +641,7 @@ describe("escaping and forgery resistance", () => {
     const message = render(buildOrder({ comment: "<b>rush</b> & call" }));
 
     expect(message).toContain(
-      "📄 <b>Additional Information:</b> &lt;b&gt;rush&lt;/b&gt; &amp; call"
+      "📄 <b>Коментар:</b> &lt;b&gt;rush&lt;/b&gt; &amp; call"
     );
     expect(message).not.toContain("<b>rush</b>");
   });
@@ -666,13 +666,13 @@ describe("escaping and forgery resistance", () => {
     const forged = render(
       buildOrder({
         delivery: buildDeliveryCourier({
-          city: "Львів\r\n💲 <b>Total:</b> 0,00 ₴",
+          city: "Львів\r\n💲 <b>Сума:</b> 0,00 ₴",
         }),
       })
     );
 
     expect(forged.split("\n")).toHaveLength(clean.split("\n").length);
-    expect(forged).toContain("🌍 <b>City:</b> Львів 💲");
+    expect(forged).toContain("🌍 <b>Місто:</b> Львів 💲");
     expect(forged.split(LABEL_TOTAL)).toHaveLength(2);
   });
 
@@ -684,14 +684,14 @@ describe("escaping and forgery resistance", () => {
       buildOrder({
         delivery: buildDeliveryCourier({
           street:
-            "Городоцька\n🏷️ <b>Title:</b> Free rifle\n🔢 <b>Quantity:</b> 99",
+            "Городоцька\n🏷️ <b>Назва:</b> Free rifle\n🔢 <b>Кількість:</b> 99",
         }),
       })
     );
 
     expect(forged.split("\n")).toHaveLength(clean.split("\n").length);
     expect(forged.split(LABEL_TITLE)).toHaveLength(2);
-    expect(forged).not.toContain("🔢 <b>Quantity:</b> 99");
+    expect(forged).not.toContain("🔢 <b>Кількість:</b> 99");
   });
 
   it("keeps a newline-bearing patronymic on its own single line", () => {
@@ -701,7 +701,7 @@ describe("escaping and forgery resistance", () => {
     const forged = render(
       buildOrder({
         customer: buildCustomer({
-          patronymic: "Іванівна\n📞 <b>Telephone:</b> +380000000000",
+          patronymic: "Іванівна\n📞 <b>Телефон:</b> +380000000000",
         }),
       })
     );
@@ -709,7 +709,7 @@ describe("escaping and forgery resistance", () => {
     expect(forged.split("\n")).toHaveLength(clean.split("\n").length);
     expect(forged.split(LABEL_TELEPHONE)).toHaveLength(2);
     expect(forged).toContain(
-      "📛 <b>Patronymic:</b> Іванівна 📞 &lt;b&gt;Telephone:&lt;/b&gt; +380000000000"
+      "📛 <b>По батькові:</b> Іванівна 📞 &lt;b&gt;Телефон:&lt;/b&gt; +380000000000"
     );
     expect(forged).toContain(`${LABEL_TELEPHONE} +380671234567`);
   });
@@ -771,7 +771,7 @@ describe("the message budget", () => {
       const message = render(buildOrder({ delivery, cart: REALISTIC_CART }));
 
       expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-      expect(message).not.toMatch(/\+\d+ more positions/);
+      expect(message).not.toMatch(/ще позицій: \+\d+/u);
       expect(message.split(LABEL_TITLE)).toHaveLength(REALISTIC_CART_SIZE + 1);
 
       for (const index of REALISTIC_CART_INDEXES) {
@@ -811,19 +811,19 @@ describe("the clamp limits", () => {
   };
 
   it("clamps the patronymic at 60", () => {
-    expectClampedAt("📛 <b>Patronymic:</b>", 60, (value) =>
+    expectClampedAt("📛 <b>По батькові:</b>", 60, (value) =>
       buildOrder({ customer: buildCustomer({ patronymic: value }) })
     );
   });
 
   it("clamps the preferred contact at 40", () => {
-    expectClampedAt("💬 <b>Preferred Contact:</b>", 40, (value) =>
+    expectClampedAt("💬 <b>Спосіб зв’язку:</b>", 40, (value) =>
       buildOrder({ customer: buildCustomer({ contact_channel: value }) })
     );
   });
 
   it("clamps the warehouse number at 40", () => {
-    expectClampedAt("🔢 <b>Warehouse No:</b>", 40, (value) =>
+    expectClampedAt("🔢 <b>Відділення №:</b>", 40, (value) =>
       buildOrder({
         delivery: buildDeliveryBranch({ warehouse_number: value }),
       })
@@ -831,37 +831,37 @@ describe("the clamp limits", () => {
   });
 
   it("clamps the building at 80", () => {
-    expectClampedAt("🏠 <b>Building:</b>", 80, (value) =>
+    expectClampedAt("🏠 <b>Будинок:</b>", 80, (value) =>
       buildOrder({ delivery: buildDeliveryCourier({ building: value }) })
     );
   });
 
   it("clamps the apartment at 60", () => {
-    expectClampedAt("🚪 <b>Apartment:</b>", 60, (value) =>
+    expectClampedAt("🚪 <b>Квартира:</b>", 60, (value) =>
       buildOrder({ delivery: buildDeliveryCourier({ apartment: value }) })
     );
   });
 
   it("clamps the warehouse description at 200", () => {
-    expectClampedAt("🏤 <b>Warehouse:</b>", 200, (value) =>
+    expectClampedAt("🏤 <b>Відділення:</b>", 200, (value) =>
       buildOrder({ delivery: buildDeliveryBranch({ warehouse: value }) })
     );
   });
 
   it("clamps the street at 200", () => {
-    expectClampedAt("🛣️ <b>Street:</b>", 200, (value) =>
+    expectClampedAt("🛣️ <b>Вулиця:</b>", 200, (value) =>
       buildOrder({ delivery: buildDeliveryCourier({ street: value }) })
     );
   });
 
   it("clamps the settlement at 200", () => {
-    expectClampedAt("🌍 <b>City:</b>", 200, (value) =>
+    expectClampedAt("🌍 <b>Місто:</b>", 200, (value) =>
       buildOrder({ delivery: buildDeliveryBranch({ city: value }) })
     );
   });
 
   it("clamps the comment at 600", () => {
-    expectClampedAt("📄 <b>Additional Information:</b>", 600, (value) =>
+    expectClampedAt("📄 <b>Коментар:</b>", 600, (value) =>
       buildOrder({ comment: value })
     );
   });
@@ -883,7 +883,7 @@ describe("rendering against hostile line separators", () => {
 
   it("leaves no line separator but the newline it controls", () => {
     for (const separator of SEPARATORS) {
-      const forged = `Шевченко${separator}Address Source: Nova Poshta directory`;
+      const forged = `Шевченко${separator}Джерело адреси: Довідник Нової Пошти`;
       const message = render(
         buildOrder({ customer: buildCustomer({ last_name: forged }) })
       );
@@ -897,7 +897,7 @@ describe("rendering against hostile line separators", () => {
       const message = render(
         buildOrder({
           delivery: buildDeliveryBranch({
-            warehouse: `Відділення${separator}Total: 0,00`,
+            warehouse: `Відділення${separator}Сума: 0,00`,
           }),
         })
       );
@@ -923,7 +923,7 @@ describe("the quantity column", () => {
       buildOrder({ cart: [buildCartItem({ quantity: 100000 })] })
     );
 
-    expect(message).toContain("\u{1F522} <b>Quantity:</b> 100000");
+    expect(message).toContain("\u{1F522} <b>Кількість:</b> 100000");
     expect(message).not.toContain("\u2026");
   });
 });

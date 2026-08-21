@@ -10,13 +10,14 @@ import {
 
 const TELEGRAM_LIMIT = 4096;
 const BOUNDARY_CART_SIZE = 40;
-const BOUNDARY_NOTE = 216;
+const BOUNDARY_NOTE = 282;
 const BOUNDARY_ITEMS = 40;
 const OVER_BOUNDARY_ITEMS = 39;
+const WIDEST_NOTE = 600;
 const CART_TITLE_LIMIT = 200;
 const CART_URL_LIMIT = 400;
 const LONGEST_TOTAL = "9".repeat(20);
-const TITLE_LABEL = "🏷️ <b>Title:</b>";
+const TITLE_LABEL = "🏷️ <b>Назва:</b>";
 const REPRO_CART_SIZE = 60;
 const REPRO_URL = "https://s.test/";
 const ASTRAL_SUFFIX = "\u{20000}";
@@ -42,6 +43,28 @@ const boundaryCart = (): Record<string, unknown>[] =>
 const itemsIn = (message: string): number =>
   message.split(TITLE_LABEL).length - 1;
 
+const renderAtNote = (note: number): string =>
+  render(buildOrder({ comment: "x".repeat(note), cart: boundaryCart() }));
+
+const itemsAtNote = (note: number): number => itemsIn(renderAtNote(note));
+
+const widestNoteFittingWholeCart = (): number => {
+  let fits = 0;
+  let drops = WIDEST_NOTE;
+
+  while (fits + 1 < drops) {
+    const middle = Math.floor((fits + drops) / 2);
+
+    if (itemsAtNote(middle) === BOUNDARY_ITEMS) {
+      fits = middle;
+    } else {
+      drops = middle;
+    }
+  }
+
+  return fits;
+};
+
 const reproCart = (suffix: string): Record<string, unknown>[] =>
   Array.from({ length: REPRO_CART_SIZE }, (_, index) =>
     buildCartItem({
@@ -51,13 +74,13 @@ const reproCart = (suffix: string): Record<string, unknown>[] =>
   );
 
 describe("the budget measured in the unit telegram counts (BDEF-4)", () => {
-  it("keeps a plain ukrainian 60-position order under the limit", () => {
+  it("keeps a 60-position order of ukrainian titles under the limit", () => {
     const message = render(buildOrder({ cart: reproCart("") }));
 
     expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-    expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
-    expect(message).toContain("👤 <b>First Name:</b> Марія");
-    expect(message).toContain("💲 <b>Total:</b>");
+    expect(message).toMatch(/… <b>ще позицій: \+\d+<\/b>$/u);
+    expect(message).toContain("👤 <b>Ім’я:</b> Марія");
+    expect(message).toContain("💲 <b>Сума:</b>");
   });
 
   it("keeps the same order under the limit when a title carries an astral character", () => {
@@ -65,7 +88,7 @@ describe("the budget measured in the unit telegram counts (BDEF-4)", () => {
 
     expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
     expect(message).toContain(ASTRAL_SUFFIX);
-    expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
+    expect(message).toMatch(/… <b>ще позицій: \+\d+<\/b>$/u);
   });
 
   it("keeps the same cart under the limit behind a free-form address", () => {
@@ -77,47 +100,34 @@ describe("the budget measured in the unit telegram counts (BDEF-4)", () => {
     );
 
     expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-    expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
+    expect(message).toMatch(/… <b>ще позицій: \+\d+<\/b>$/u);
   });
 });
 
 describe("the shared telegram budget", () => {
-  it("fits exactly the cart the budget has room for", () => {
-    const message = render(
-      buildOrder({
-        comment: "x".repeat(BOUNDARY_NOTE),
-        cart: boundaryCart(),
-      })
-    );
+  it("puts the truncation edge exactly where the boundary note pins it", () => {
+    const atEdge = renderAtNote(BOUNDARY_NOTE);
+    const pastEdge = renderAtNote(BOUNDARY_NOTE + 1);
 
-    expect(itemsIn(message)).toBe(BOUNDARY_ITEMS);
-    expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+    expect(widestNoteFittingWholeCart()).toBe(BOUNDARY_NOTE);
+    expect(itemsIn(atEdge)).toBe(BOUNDARY_ITEMS);
+    expect(atEdge.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+    expect(itemsIn(pastEdge)).toBe(OVER_BOUNDARY_ITEMS);
+    expect(pastEdge).toMatch(/… <b>ще позицій: \+1<\/b>$/u);
   });
 
-  it("drops one position as soon as the header grows by a single character", () => {
-    const message = render(
-      buildOrder({
-        comment: "x".repeat(BOUNDARY_NOTE + 1),
-        cart: boundaryCart(),
-      })
-    );
-
-    expect(itemsIn(message)).toBe(OVER_BOUNDARY_ITEMS);
-    expect(message).toMatch(/… <b>\+1 more positions<\/b>$/u);
-  });
-
-  it("spends the same budget and marks the same way behind a free-form address", () => {
+  it("truncates a free-form address order and marks it the same way", () => {
     const message = render(
       buildOrder({
         locale: "uk",
         delivery: buildDeliveryGeneric(),
-        comment: "x".repeat(BOUNDARY_NOTE),
+        comment: "x".repeat(WIDEST_NOTE),
         cart: boundaryCart(),
       })
     );
 
     expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-    expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
+    expect(message).toMatch(/… <b>ще позицій: \+\d+<\/b>$/u);
     expect(itemsIn(message)).toBeGreaterThan(0);
   });
 
@@ -164,7 +174,7 @@ describe("the shared cart clamps", () => {
     );
 
     expect(productUrl.length).toBe(CART_URL_LIMIT);
-    expect(message).toContain(`🔗 <b>Product URL:</b> ${productUrl}`);
+    expect(message).toContain(`🔗 <b>Посилання:</b> ${productUrl}`);
     expect(message).not.toContain(`${productUrl}…`);
   });
 
@@ -176,7 +186,7 @@ describe("the shared cart clamps", () => {
 
     expect(productUrl.length).toBe(CART_URL_LIMIT + 1);
     expect(message).toContain(
-      `🔗 <b>Product URL:</b> ${productUrl.slice(0, CART_URL_LIMIT)}…`
+      `🔗 <b>Посилання:</b> ${productUrl.slice(0, CART_URL_LIMIT)}…`
     );
   });
 });
@@ -186,7 +196,7 @@ describe("the clamps that no accepted payload can reach", () => {
     const message = render(buildOrder({ total: LONGEST_TOTAL }));
     const line = message
       .split("\n")
-      .find((entry) => entry.startsWith("💲 <b>Total:</b>"));
+      .find((entry) => entry.startsWith("💲 <b>Сума:</b>"));
 
     expect(line).toBeDefined();
     expect(line).not.toContain("…");
@@ -198,7 +208,7 @@ describe("the clamps that no accepted payload can reach", () => {
       buildOrder({ cart: [buildCartItem({ quantity: 100000 })] })
     );
 
-    expect(message).toContain("🔢 <b>Quantity:</b> 100000");
+    expect(message).toContain("🔢 <b>Кількість:</b> 100000");
   });
 
   it("bounds the work an escape-heavy note can force", () => {

@@ -98,23 +98,23 @@ describe("composeMessage when the header leaves no room for the cart", () => {
 
   it("emits the header and the omitted marker with no dangling separator", () => {
     const message = composeMessage(
-      ["👤 <b>First Name:</b> " + "ф".repeat(4000)],
+      ["👤 <b>Ім’я:</b> " + "ф".repeat(4000)],
       [cartLine("A"), cartLine("B")]
     );
 
-    expect(message).toMatch(/… <b>\+2 more positions<\/b>$/u);
-    expect(message).not.toContain("🏷️ <b>Title:</b>");
-    expect(message).not.toMatch(/\n\n… <b>\+/u);
+    expect(message).toMatch(/… <b>ще позицій: \+2<\/b>$/u);
+    expect(message).not.toContain("🏷️ <b>Назва:</b>");
+    expect(message).not.toMatch(/\n\n… <b>ще/u);
   });
 
   it("still renders the cart when the header does leave room", () => {
     const message = composeMessage(
-      ["👤 <b>First Name:</b> Марія"],
+      ["👤 <b>Ім’я:</b> Марія"],
       [cartLine("A"), cartLine("B")]
     );
 
-    expect(message).toContain("🏷️ <b>Title:</b> A");
-    expect(message).toContain("🏷️ <b>Title:</b> B");
-    expect(message).not.toMatch(/more positions/u);
+    expect(message).toContain("🏷️ <b>Назва:</b> A");
+    expect(message).toContain("🏷️ <b>Назва:</b> B");
+    expect(message).not.toMatch(/ще позицій/u);
   });
 });
