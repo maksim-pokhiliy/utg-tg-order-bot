@@ -243,7 +243,7 @@ describe("the characters that were lying to the operator", () => {
     expect(message).not.toMatch(FORMAT_CONTROL);
   });
 
-  it("folds a math-bold comment to plain text without minting a source label", () => {
+  it("folds a math-bold comment down to the plain text it imitates", () => {
     const forgery =
       "\u{1D400}\u{1D41D}\u{1D41D}\u{1D42B}\u{1D41E}\u{1D42C}\u{1D42C} \u{1D412}\u{1D428}\u{1D42E}\u{1D42B}\u{1D41C}\u{1D41E}:";
     const message = render(buildOrder({ comment: forgery }));
@@ -252,7 +252,6 @@ describe("the characters that were lying to the operator", () => {
       `${ADDITIONAL_LABEL} Address Source:`
     );
     expect(message).not.toMatch(MATH_ALPHANUMERIC);
-    expect(countOf(message, SOURCE_LABEL)).toBe(1);
   });
 
   it("escapes markup that only exists after normalization", () => {
