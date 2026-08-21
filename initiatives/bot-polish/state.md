@@ -1,7 +1,7 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-20 (U6 merged — the relay knows only v2. This board is COMPLETE and the
-initiative can close; what is left here is planner ops, not steps)
+**Updated:** 2026-08-21 (U8 merged — the operators read Ukrainian. This board stays COMPLETE;
+what remains here is planner ops, and the shop's initiative is ready to close)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -18,48 +18,47 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 ## Next action
 
-**This board is COMPLETE.** B1–B5 shipped and prod-verified, and **U6 merged 2026-08-20**
-(PR #5 `a81fa1e`) — the paired step the initiative was deliberately held open to host.
+**This board is COMPLETE and has now hosted both paired steps it was held open for.** B1–B5
+shipped; **U6** merged 2026-08-20 (v1 deleted); **U8** merged 2026-08-21 as `da2f9d6` (PR #6) —
+the order message now speaks Ukrainian to the operators, which was an owner ruling from the U7
+browser gate, not an engineering preference.
 
-The relay now accepts exactly ONE payload shape. The v1 decoder, renderer and golden corpus are
-deleted, so a versionless or `version: 1` body is an ordinary 400 through the normal validation
-path. BDEF-6, BDEF-7 and the BDEF-2 batch closed with it, as predicted — they were waiting for
-precisely this step. `schema_version` stays in the schema and always reads `2`: deliberate, it is
-the only way a future version change becomes observable in production data.
+What U8 changed here: 21 labels plus the delivery-mode names, the address-source guidance, the
+contact channel (`call → Дзвінок`, `telegram → Telegram`, `viber → Viber`, anything else printed
+verbatim — fail-open by compiler, `noUncheckedIndexedAccess` makes removing the fallback a build
+error), and the omitted-cart marker. **The marker must never decline**: `omittedMarkerAllowance`
+measures it at n=0 and assumes only digit count varies, so a declining form under-reserves, the
+message passes 4096, Telegram rejects it and the order is lost. Verified by the planner —
+mutating it to a declining form reddens six budget tests.
 
-**Verified by real requests before it merged**, not only by the 399-test battery: the compiled
-deploy entrypoint was hosted locally with real credentials and the real database, and curled —
-401 without a secret, 401 with a wrong one, **400 on `version: 1` and on a genuine versionless
-legacy body**, 200 on v2 with `order_stored`, a Neon row at `schema_version = 2` and a delivered
-Telegram message. Preview deployments could not serve this: they are behind Deployment
-Protection, which 302s to SSO before the route is reached.
+The Ukrainian labels BUY cart room rather than costing it: the header shrank 23–32 units depending
+on mode, the cart line by one, and a 60-position order now fits 41 rows where it fit 40.
 
-**One thing the deletion taught, worth carrying to any future removal:** three guards had their
-only end-to-end pin riding on something v1 carried (cart-line HTML escaping, the 600-char comment
-clamp, `payloadField`'s normalise-then-escape ordering), and a fourth — "auth precedes the body" —
-was never pinned at all, despite being the invariant that authorised the deletion. All four are
-pinned now. When a deletion removes a version it also removes whichever guards were observable
-only through it, and those are invisible by construction.
+**Its own review, 12 pooled → 12 reported, no tail**, found three things worth remembering: the
+free-form saturation test sat 318 characters past its own edge (a regression widening that header
+by ~300 units kept it green); the label-coverage assertion was one-sided, so a label added to the
+code and not to the list escaped; and the omitted marker — the one bold run carrying a number the
+operator acts on — was never probed for forgery. All three closed with mutation proofs. Battery
+399 → 413.
 
 ### What remains here is planner ops, not steps
 
 - **BDEF-11** — swap the relay's Neon role for a scoped one (INSERT/SELECT/UPDATE on `orders`
   only; today it authenticates as the schema owner and could `drop table orders`). Needs a Vercel
   env update plus a redeploy of the **serving** deployment resolved by id from its logs, never the
-  first URL in `vercel ls --prod` (the BDEF-1 lesson, which once cost three minutes of 500s). It
-  also retires the exposed credential from the relay, which partly answers the owner's unscheduled
-  password rotation.
+  first URL in `vercel ls --prod` — the BDEF-1 lesson, which once cost three minutes of 500s.
 - **BDEF-10** — B5 created a PII datastore with no retention policy.
 - **BDEF-8** — which Telegram width metric is actually enforced; a direct Bot API probe, worth
-  ~980 units of cart room.
-- **BDEF-12** — CLOSED: promoted to the shop's ledger as UAC-25 and narrowed there to its policy
-  half by U6.
-- **UAC-26** in the shop ledger carries this repo's U6 review tail (six items, none a defect
-  today). The currency case-sensitivity hole is the one worth doing first — it was ported from
-  master knowingly.
+  ~980 units of cart room. U8's measurements make this cheaper than it was.
+- **The one worth scheduling**, carried in the shop's ledger as **UAC-27**: the contact-channel
+  vocabulary is a VALUE-level cross-repo coupling that nothing executable pins. `contract.ts`
+  lists keys only; `call | telegram | viber` lives in the shop's prose. Rename `call` on either
+  side and the operator quietly reads the raw code with no test reddening anywhere. It is the
+  exact class U6 and U8 spent themselves hunting, and it needs `contract.ts` extended to pin
+  values — which both U8 halves were deliberately fenced out of.
 
-The shop's initiative has one step left, **U7**, which is the owner's browser gate plus
-`/initiative-close`. Nothing in this repo blocks it.
+The shop's initiative has no steps left; it closes with `/initiative-close`. Nothing here blocks
+that.
 
 ## Open decisions awaiting ratification
 

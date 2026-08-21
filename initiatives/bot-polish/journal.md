@@ -485,3 +485,47 @@ Append-only. One entry per session/step.
 - **This board is complete.** What remains is planner ops — BDEF-11 (scoped Neon role), BDEF-10
   (retention), BDEF-8 (the Telegram width metric) — plus the shop's U7 gate, which nothing here
   blocks.
+
+## 2026-08-21 — U8: the operators get their language, and a one-sided assertion is caught
+
+- **Merged as a pair** — this repo's PR #6 `da2f9d6` (10 files, +549/−233) with the shop's #25.
+  Battery 399 → 413. An owner ruling from the U7 browser gate: the message is read by Ukrainian
+  operators in an internal channel, so it is Ukrainian — not localised per order locale.
+- **The width objection was measured before it was raised as a risk, and it pointed the other
+  way.** Header 194 → 164 units, cart line 24 → 23; a 60-position order now fits 41 rows where it
+  fit 40. `Additional Information` → `Коментар` gives back 14 on its own.
+- **The omitted marker must never decline.** `omittedMarkerAllowance` measures it at n=0 and
+  assumes only digit count varies with n; a declining form under-reserves, the message passes
+  4096, Telegram rejects it, and the order is lost. Shipped as `ще позицій: +N`. The planner
+  verified it independently — mutating it to `та ще N позицій` reddens six budget tests.
+- **Its review, 12 pooled → 12 reported, no tail, found three holes worth naming.** The free-form
+  saturation case sat **318 characters past its own edge**, so a regression widening that header
+  by ~300 units stayed green. The label-coverage assertion was **one-sided** — a label added to
+  the code and never added to the list escaped it. And the omitted marker, the only bold run
+  carrying a number the operator acts on, was **never probed for forgery**. All three closed with
+  mutation proofs; 20 mutations, 19 killing their named test, one reported as a deliberate
+  negative result rather than dressed up.
+- **The executor refused to guess a value it could not see, and was right to.** It was given the
+  channel display names but not the keys, and `../utg-2.0` is behind its fence. It said plainly
+  that guessing `phone` or `дзвінок` would produce a map that never fires and a test that stays
+  green — a silent no-op wearing the shape of a working feature. The real set is
+  `["call","telegram","viber"] as const`; both intuitions available from inside this repo were
+  wrong.
+- **It also corrected the planner on mechanism.** The step prompt said the labels go through
+  `generatedField`; they do not — that wraps values, and labels are raw literals outside the
+  interpolation. Nothing escapes or clamps them, so a label carrying `&`, `<` or `>` would corrupt
+  Telegram's HTML rather than be escaped, and labels have no length ceiling at all. A live
+  constraint on every future label.
+- **One proof technique was unavailable and said so.** B4 showed its golden re-cut was honest by
+  leaving 11 of 12 entries byte-identical — the untouched majority WAS the proof. Here all 78
+  lines move, so that technique is dead by the nature of the task. Its replacement: invariance of
+  shape, sentinels, line count and order, checkable by grep without reading Ukrainian, plus pins
+  whose form a generated golden cannot satisfy by accident. Stated in the PR body BEFORE the diff
+  table, so a reviewer reads the explanation before noticing the absence.
+- **Cross-repo hazard, recorded:** two executors in different repositories shared one scratchpad
+  path, and one overwrote the other's mutation driver. The foreign script then ran twice without
+  complaint, because `python .replace()` with no occurrence assertion "succeeds" on a file that is
+  not yours. No damage — verified byte-identical — but mutation results from that window were
+  untrustworthy and the planner re-verified the sharpest claim by hand.
+- **Left open here, and it is the one worth scheduling:** the channel vocabulary is a value-level
+  cross-repo coupling nothing executable pins. Carried in the shop's ledger as UAC-27.
