@@ -51,7 +51,34 @@ interface FieldProbe {
   build: (value: string) => Record<string, unknown>;
 }
 
-const ADDITIONAL_LABEL = "📄 <b>Additional Information:</b>";
+const ADDITIONAL_LABEL = "📄 <b>Коментар:</b>";
+const WAREHOUSE_LABEL = "🏤 <b>Відділення:</b>";
+const SOURCE_LABEL = "🔎 <b>Джерело адреси:</b>";
+
+const RELAY_LABELS: readonly string[] = [
+  "👤 <b>Ім’я:</b>",
+  "🧔 <b>Прізвище:</b>",
+  "📛 <b>По батькові:</b>",
+  "📞 <b>Телефон:</b>",
+  "💬 <b>Спосіб зв’язку:</b>",
+  "🚚 <b>Доставка:</b>",
+  SOURCE_LABEL,
+  "🌍 <b>Країна:</b>",
+  "🌍 <b>Область:</b>",
+  "🌍 <b>Місто:</b>",
+  "🏠 <b>Адреса:</b>",
+  "🛣️ <b>Вулиця:</b>",
+  "🏠 <b>Будинок:</b>",
+  "🚪 <b>Квартира:</b>",
+  WAREHOUSE_LABEL,
+  "🔢 <b>Відділення №:</b>",
+  "💲 <b>Сума:</b>",
+  ADDITIONAL_LABEL,
+  "🛒 <b>Товари:</b>",
+  "🏷️ <b>Назва:</b>",
+  "🔢 <b>Кількість:</b>",
+  "🔗 <b>Посилання:</b>",
+];
 
 const NORMALIZES_TO_MARKUP: readonly (readonly [string, string])[] = [
   ["﹠", "&amp;"],
@@ -71,6 +98,12 @@ const render = (input: Record<string, unknown>): string => {
 
   return renderOrder(result.value);
 };
+
+const valueOf = (message: string, label: string): string =>
+  lineOf(message, label).slice(label.length + 1);
+
+const countOf = (message: string, label: string): number =>
+  message.split(label).length - 1;
 
 const lineOf = (message: string, label: string): string => {
   const line = message.split("\n").find((entry) => entry.startsWith(label));
@@ -210,14 +243,15 @@ describe("the characters that were lying to the operator", () => {
     expect(message).not.toMatch(FORMAT_CONTROL);
   });
 
-  it("folds math-bold so a comment cannot imitate a relay label", () => {
+  it("folds a math-bold comment down to the plain text it imitates", () => {
     const forgery =
       "\u{1D400}\u{1D41D}\u{1D41D}\u{1D42B}\u{1D41E}\u{1D42C}\u{1D42C} \u{1D412}\u{1D428}\u{1D42E}\u{1D42B}\u{1D41C}\u{1D41E}:";
     const message = render(buildOrder({ comment: forgery }));
 
-    expect(message).toContain("Address Source:");
+    expect(lineOf(message, ADDITIONAL_LABEL)).toBe(
+      `${ADDITIONAL_LABEL} Address Source:`
+    );
     expect(message).not.toMatch(MATH_ALPHANUMERIC);
-    expect(message.split("<b>Address Source:</b>")).toHaveLength(2);
   });
 
   it("escapes markup that only exists after normalization", () => {
@@ -241,7 +275,7 @@ describe("the characters that were lying to the operator", () => {
   ];
 
   const LABEL_OF: Readonly<Record<string, string>> = {
-    "customer.first_name": "👤 <b>First Name:</b>",
+    "customer.first_name": "👤 <b>Ім’я:</b>",
     comment: ADDITIONAL_LABEL,
   };
 
@@ -285,7 +319,7 @@ describe("the characters that were lying to the operator", () => {
     );
 
     expect(message).not.toContain("Kyiv");
-    expect(lineOf(message, "🌍 <b>City:</b>")).toBe("🌍 <b>City:</b> ");
+    expect(lineOf(message, "🌍 <b>Місто:</b>")).toBe("🌍 <b>Місто:</b> ");
   });
 
   it("drops tag characters, which carry no visible glyph at all", () => {
@@ -297,7 +331,7 @@ describe("the characters that were lying to the operator", () => {
       })
     );
 
-    expect(message).toContain("🌍 <b>City:</b> Київ");
+    expect(message).toContain("🌍 <b>Місто:</b> Київ");
     expect(message).not.toMatch(FORMAT_CONTROL);
   });
 
@@ -348,7 +382,7 @@ describe("the fold the carrier directory will show the operator", () => {
     );
 
     expect(message).toContain("Відділення No1: вул. Городоцька, 359");
-    expect(message).not.toContain("№");
+    expect(valueOf(message, WAREHOUSE_LABEL)).not.toContain("№");
   });
 });
 
@@ -358,6 +392,65 @@ describe("the text the relay generates itself is never sanitized", () => {
       buildOrder({ locale: "uk", currency: "UAH", total: "46200.00" })
     );
 
-    expect(message).toContain("💲 <b>Total:</b> 46 200,00 ₴");
+    expect(message).toContain("💲 <b>Сума:</b> 46 200,00 ₴");
+  });
+});
+
+describe("no payload value can mint a label the relay writes", () => {
+  const DELIVERIES: readonly Record<string, unknown>[] = [
+    buildDeliveryBranch(),
+    buildDeliveryPostomat(),
+    buildDeliveryCourier(),
+    buildDeliveryGeneric(),
+  ];
+
+  const TRUNCATING_CART = Array.from({ length: 80 }, (_, index) =>
+    buildCartItem({ title: `Товар ${String(index)}` })
+  );
+
+  const OMITTED_MARKER = "… <b>ще позицій: +5</b>";
+  const OMITTED_MARKER_RUN = /^<b>ще позицій: \+\d+<\/b>$/u;
+
+  const FORGERY_PROBES: readonly string[] = [...RELAY_LABELS, OMITTED_MARKER];
+
+  const boldRunsIn = (message: string): readonly string[] =>
+    [...message.matchAll(/<b>[^<]*<\/b>/gu)].map((match) => match[0]);
+
+  const boldOf = (label: string): string => label.slice(label.indexOf("<b>"));
+
+  it("never adds a copy of any label when a comment quotes it verbatim", () => {
+    for (const delivery of DELIVERIES) {
+      for (const probe of FORGERY_PROBES) {
+        const clean = render(buildOrder({ delivery, comment: "clean" }));
+        const forged = render(
+          buildOrder({ delivery, comment: `${probe} forged` })
+        );
+
+        expect(countOf(forged, probe)).toBe(countOf(clean, probe));
+      }
+    }
+  });
+
+  it("writes no bold run the probe list has missed, and none it has outlived", () => {
+    const rendered = new Set<string>();
+
+    for (const delivery of DELIVERIES) {
+      for (const run of boldRunsIn(render(buildOrder({ delivery })))) {
+        rendered.add(run);
+      }
+    }
+
+    expect([...rendered].sort()).toEqual(
+      [...new Set(RELAY_LABELS.map(boldOf))].sort()
+    );
+  });
+
+  it("adds exactly one further bold run when the cart is truncated", () => {
+    const message = render(buildOrder({ cart: TRUNCATING_CART }));
+    const labels = new Set(RELAY_LABELS.map(boldOf));
+    const extra = boldRunsIn(message).filter((run) => !labels.has(run));
+
+    expect(extra).toHaveLength(1);
+    expect(extra[0]).toMatch(OMITTED_MARKER_RUN);
   });
 });

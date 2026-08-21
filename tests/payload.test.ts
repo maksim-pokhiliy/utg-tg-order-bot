@@ -1269,7 +1269,7 @@ describe("the reject reason set", () => {
 
       rendered += 1;
       expect(message.length).toBeLessThanOrEqual(4096);
-      expect(message).toContain("\u{1F6D2} <b>Products:</b>");
+      expect(message).toContain("\u{1F6D2} <b>Товари:</b>");
     }
 
     expect(rendered).toBeGreaterThan(100);

@@ -8,8 +8,8 @@ import {
 } from "./support/saturation.js";
 
 const TELEGRAM_LIMIT = 4096;
-const TITLE_LABEL = "🏷️ <b>Title:</b>";
-const TOTAL_LABEL = "💲 <b>Total:</b>";
+const TITLE_LABEL = "🏷️ <b>Назва:</b>";
+const TOTAL_LABEL = "💲 <b>Сума:</b>";
 const MIN_SURVIVING_BLOCKS = 2;
 const ITEM_SEPARATOR_WIDTH = 2;
 
@@ -25,7 +25,7 @@ describe("the composed message can never exceed the telegram limit", () => {
       });
 
       expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-      expect(message).toMatch(/… <b>\+\d+ more positions<\/b>$/u);
+      expect(message).toMatch(/… <b>ще позицій: \+\d+<\/b>$/u);
       expect(message).toContain(TOTAL_LABEL);
       expect(blocksIn(message)).toBeGreaterThanOrEqual(MIN_SURVIVING_BLOCKS);
     });

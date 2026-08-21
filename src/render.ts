@@ -11,7 +11,7 @@ const MAX_ESCAPE_EXPANSION = 5;
 const MIN_OMITTED_DIGITS = 6;
 const ELLIPSIS = "…";
 const ITEM_SEPARATOR = "\n\n";
-const PRODUCTS_HEADING = "🛒 <b>Products:</b>";
+const PRODUCTS_HEADING = "🛒 <b>Товари:</b>";
 const LEGACY_LISTING_PREFIX = " ";
 
 const DEFAULT_LOCALE = "uk";
@@ -23,7 +23,7 @@ const LOCALE_CURRENCY: ReadonlyMap<string, string> = new Map([
 ]);
 
 export const buildOmittedMarker = (omitted: number): string =>
-  `${ELLIPSIS} <b>+${String(omitted)} more positions</b>`;
+  `${ELLIPSIS} <b>ще позицій: +${String(omitted)}</b>`;
 
 export const omittedMarkerAllowance = (cartSize: number): number =>
   buildOmittedMarker(0).length +
@@ -105,41 +105,41 @@ export const formatTotal = (
   }).format(total);
 
 export const firstNameLine = (value: string): string =>
-  `👤 <b>First Name:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+  `👤 <b>Ім’я:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
 
 export const lastNameLine = (value: string): string =>
-  `🧔 <b>Last Name:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+  `🧔 <b>Прізвище:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
 
 export const telephoneLine = (value: string): string =>
-  `📞 <b>Telephone:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+  `📞 <b>Телефон:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
 
 export const countryLine = (value: string): string =>
-  `🌍 <b>Country:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+  `🌍 <b>Країна:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
 
 export const stateLine = (value: string): string =>
-  `🌍 <b>State:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+  `🌍 <b>Область:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
 
 export const cityLine = (value: string): string =>
-  `🌍 <b>City:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+  `🌍 <b>Місто:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
 
 export const addressLine = (value: string): string =>
-  `🏠 <b>Address:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
+  `🏠 <b>Адреса:</b> ${singleLineField(value, CONTACT_FIELD_LIMIT)}`;
 
 export const totalLine = (
   total: PlainDecimal,
   locale: string,
   currency: string | undefined
 ): string =>
-  `💲 <b>Total:</b> ${generatedField(formatTotal(total, locale, currency), TOTAL_LIMIT)}`;
+  `💲 <b>Сума:</b> ${generatedField(formatTotal(total, locale, currency), TOTAL_LIMIT)}`;
 
 export const additionalLine = (value: string): string =>
-  `📄 <b>Additional Information:</b> ${payloadField(value, ADDITIONAL_LIMIT)}`;
+  `📄 <b>Коментар:</b> ${payloadField(value, ADDITIONAL_LIMIT)}`;
 
 const buildItem = (item: OrderCartItem): string =>
   [
-    `🏷️ <b>Title:</b> ${singleLineField(item.title, CART_TITLE_LIMIT)}`,
-    `🔢 <b>Quantity:</b> ${generatedField(String(item.quantity), QUANTITY_LIMIT)}`,
-    `🔗 <b>Product URL:</b> ${singleLineField(item.productUrl, CART_URL_LIMIT)}`,
+    `🏷️ <b>Назва:</b> ${singleLineField(item.title, CART_TITLE_LIMIT)}`,
+    `🔢 <b>Кількість:</b> ${generatedField(String(item.quantity), QUANTITY_LIMIT)}`,
+    `🔗 <b>Посилання:</b> ${singleLineField(item.productUrl, CART_URL_LIMIT)}`,
   ].join("\n");
 
 export const composeMessage = (

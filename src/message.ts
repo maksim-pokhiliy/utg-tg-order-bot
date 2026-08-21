@@ -22,17 +22,26 @@ const APARTMENT_LIMIT = 60;
 const WAREHOUSE_NUMBER_LIMIT = 40;
 
 const DELIVERY_MODE_LABELS: Readonly<Record<DeliveryMode, string>> = {
-  np_branch: "Nova Poshta branch",
-  np_postomat: "Nova Poshta parcel locker",
-  np_courier: "Nova Poshta courier",
-  generic: "Free-form address",
+  np_branch: "Відділення Нової Пошти",
+  np_postomat: "Поштомат Нової Пошти",
+  np_courier: "Кур’єр Нової Пошти",
+  generic: "Довільна адреса",
 };
 
-const SOURCE_DIRECTORY = "Nova Poshta directory";
+const CONTACT_CHANNEL_TEXTS: ReadonlyMap<string, string> = new Map([
+  ["call", "Дзвінок"],
+  ["telegram", "Telegram"],
+  ["viber", "Viber"],
+]);
+
+const SOURCE_DIRECTORY = "Довідник Нової Пошти";
 const SOURCE_DIRECTORY_COURIER =
-  "Nova Poshta directory (city only — verify the street on the call)";
-const SOURCE_MANUAL = "typed by hand — verify on the call";
-const SOURCE_UNSTATED = "not stated — verify on the call";
+  "Довідник Нової Пошти (лише місто — вулицю уточніть у дзвінку)";
+const SOURCE_MANUAL = "введено вручну — уточніть у дзвінку";
+const SOURCE_UNSTATED = "не вказано — уточніть у дзвінку";
+
+const contactChannelText = (value: string | undefined): string | undefined =>
+  value === undefined ? undefined : (CONTACT_CHANNEL_TEXTS.get(value) ?? value);
 
 const optionalLine = (
   label: string,
@@ -45,14 +54,14 @@ const customerLines = (customer: OrderCustomer): readonly string[] => [
   firstNameLine(customer.first_name),
   lastNameLine(customer.last_name),
   ...optionalLine(
-    "📛 <b>Patronymic:</b>",
+    "📛 <b>По батькові:</b>",
     customer.patronymic,
     PATRONYMIC_LIMIT
   ),
   telephoneLine(customer.phone),
   ...optionalLine(
-    "💬 <b>Preferred Contact:</b>",
-    customer.contact_channel,
+    "💬 <b>Спосіб зв’язку:</b>",
+    contactChannelText(customer.contact_channel),
     CONTACT_CHANNEL_LIMIT
   ),
 ];
@@ -76,7 +85,7 @@ const resolveSourceText = (delivery: OrderDelivery): string => {
 };
 
 const sourceLine = (delivery: OrderDelivery): string =>
-  `🔎 <b>Address Source:</b> ${resolveSourceText(delivery)}`;
+  `🔎 <b>Джерело адреси:</b> ${resolveSourceText(delivery)}`;
 
 const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
   if (delivery.mode === "generic") {
@@ -93,10 +102,10 @@ const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
   if (delivery.mode === "np_courier") {
     return [
       cityLine(delivery.city),
-      `🛣️ <b>Street:</b> ${singleLineField(delivery.street, DELIVERY_FIELD_LIMIT)}`,
-      `🏠 <b>Building:</b> ${singleLineField(delivery.building, BUILDING_LIMIT)}`,
+      `🛣️ <b>Вулиця:</b> ${singleLineField(delivery.street, DELIVERY_FIELD_LIMIT)}`,
+      `🏠 <b>Будинок:</b> ${singleLineField(delivery.building, BUILDING_LIMIT)}`,
       ...optionalLine(
-        "🚪 <b>Apartment:</b>",
+        "🚪 <b>Квартира:</b>",
         delivery.apartment,
         APARTMENT_LIMIT
       ),
@@ -105,9 +114,9 @@ const deliveryLines = (delivery: OrderDelivery): readonly string[] => {
 
   return [
     cityLine(delivery.city),
-    `🏤 <b>Warehouse:</b> ${singleLineField(delivery.warehouse, DELIVERY_FIELD_LIMIT)}`,
+    `🏤 <b>Відділення:</b> ${singleLineField(delivery.warehouse, DELIVERY_FIELD_LIMIT)}`,
     ...optionalLine(
-      "🔢 <b>Warehouse No:</b>",
+      "🔢 <b>Відділення №:</b>",
       delivery.warehouse_number,
       WAREHOUSE_NUMBER_LIMIT
     ),
@@ -119,7 +128,7 @@ const commentLines = (comment: string | undefined): readonly string[] =>
 
 const buildHeader = (payload: OrderPayload): readonly string[] => [
   ...customerLines(payload.customer),
-  `🚚 <b>Delivery:</b> ${DELIVERY_MODE_LABELS[payload.delivery.mode]}`,
+  `🚚 <b>Доставка:</b> ${DELIVERY_MODE_LABELS[payload.delivery.mode]}`,
   sourceLine(payload.delivery),
   ...deliveryLines(payload.delivery),
   totalLine(payload.total, payload.locale, payload.currency),

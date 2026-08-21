@@ -175,9 +175,9 @@ describe("POST /api/place_order with a full envelope", () => {
     expect(sent.url).toBe(TELEGRAM_URL);
     expect(sent.chatId).toBe(CHAT_ID);
     expect(sent.parseMode).toBe("HTML");
-    expect(sent.text).toContain("👤 <b>First Name:</b> Марія");
-    expect(sent.text).toContain("🚚 <b>Delivery:</b> Nova Poshta branch");
-    expect(sent.text).toContain("🏤 <b>Warehouse:</b>");
+    expect(sent.text).toContain("👤 <b>Ім’я:</b> Марія");
+    expect(sent.text).toContain("🚚 <b>Доставка:</b> Відділення Нової Пошти");
+    expect(sent.text).toContain("🏤 <b>Відділення:</b>");
   });
 
   it("parses a genuinely serialised body off the wire", async () => {
@@ -187,7 +187,7 @@ describe("POST /api/place_order with a full envelope", () => {
 
     expect(response.status).toBe(200);
     expect(readSentMessage(fetchStub).text).toContain(
-      "🔎 <b>Address Source:</b> Nova Poshta directory"
+      "🔎 <b>Джерело адреси:</b> Довідник Нової Пошти"
     );
   });
 
@@ -265,7 +265,7 @@ describe("POST /api/place_order with a full envelope", () => {
 
     const sent = readSentMessage(fetchStub);
 
-    expect(sent.text).toContain("💲 <b>Total:</b> ₴250.00");
+    expect(sent.text).toContain("💲 <b>Сума:</b> ₴250.00");
     expect(sent.text).not.toContain("$");
   });
 
