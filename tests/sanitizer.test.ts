@@ -404,32 +404,53 @@ describe("no payload value can mint a label the relay writes", () => {
     buildDeliveryGeneric(),
   ];
 
+  const TRUNCATING_CART = Array.from({ length: 80 }, (_, index) =>
+    buildCartItem({ title: `Товар ${String(index)}` })
+  );
+
+  const OMITTED_MARKER = "… <b>ще позицій: +5</b>";
+  const OMITTED_MARKER_RUN = /^<b>ще позицій: \+\d+<\/b>$/u;
+
+  const FORGERY_PROBES: readonly string[] = [...RELAY_LABELS, OMITTED_MARKER];
+
+  const boldRunsIn = (message: string): readonly string[] =>
+    [...message.matchAll(/<b>[^<]*<\/b>/gu)].map((match) => match[0]);
+
+  const boldOf = (label: string): string => label.slice(label.indexOf("<b>"));
+
   it("never adds a copy of any label when a comment quotes it verbatim", () => {
     for (const delivery of DELIVERIES) {
-      for (const label of RELAY_LABELS) {
+      for (const probe of FORGERY_PROBES) {
         const clean = render(buildOrder({ delivery, comment: "clean" }));
         const forged = render(
-          buildOrder({ delivery, comment: `${label} forged` })
+          buildOrder({ delivery, comment: `${probe} forged` })
         );
 
-        expect(countOf(forged, label)).toBe(countOf(clean, label));
+        expect(countOf(forged, probe)).toBe(countOf(clean, probe));
       }
     }
   });
 
-  it("covers every label the relay can write, so the list cannot rot", () => {
-    const seen = new Set<string>();
+  it("writes no bold run the probe list has missed, and none it has outlived", () => {
+    const rendered = new Set<string>();
 
     for (const delivery of DELIVERIES) {
-      const message = render(buildOrder({ delivery }));
-
-      for (const label of RELAY_LABELS) {
-        if (message.includes(label)) {
-          seen.add(label);
-        }
+      for (const run of boldRunsIn(render(buildOrder({ delivery })))) {
+        rendered.add(run);
       }
     }
 
-    expect(seen.size).toBe(RELAY_LABELS.length);
+    expect([...rendered].sort()).toEqual(
+      [...new Set(RELAY_LABELS.map(boldOf))].sort()
+    );
+  });
+
+  it("adds exactly one further bold run when the cart is truncated", () => {
+    const message = render(buildOrder({ cart: TRUNCATING_CART }));
+    const labels = new Set(RELAY_LABELS.map(boldOf));
+    const extra = boldRunsIn(message).filter((run) => !labels.has(run));
+
+    expect(extra).toHaveLength(1);
+    expect(extra[0]).toMatch(OMITTED_MARKER_RUN);
   });
 });

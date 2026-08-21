@@ -473,7 +473,7 @@ const lineValue = (message: string, label: string): string => {
   return line.slice(label.length + 1);
 };
 
-const expectEveryLabelUkrainian = (message: string): void => {
+const expectNoLatinInLabels = (message: string): void => {
   const labels = labelsOf(message);
 
   expect(labels.length).toBeGreaterThanOrEqual(MIN_RENDERED_LABELS);
@@ -483,23 +483,23 @@ const expectEveryLabelUkrainian = (message: string): void => {
   }
 };
 
-describe("the alphabet the labels are written in", () => {
+describe("the script the labels are written in", () => {
   for (const { name, delivery } of CLEAN_DELIVERIES) {
-    it(`writes every label in ukrainian for ${name}`, () => {
-      expectEveryLabelUkrainian(render(buildOrder({ delivery })));
+    it(`writes no label in latin script for ${name}`, () => {
+      expectNoLatinInLabels(render(buildOrder({ delivery })));
     });
   }
 
-  it("writes the omitted marker in ukrainian too", () => {
+  it("writes no latin script in the omitted marker either", () => {
     const message = render(
       buildOrder({ comment: HUGE, cart: PATHOLOGICAL_CART })
     );
 
     expect(message).toContain("ще позицій:");
-    expectEveryLabelUkrainian(message);
+    expectNoLatinInLabels(message);
   });
 
-  it("names the delivery mode and the address source in ukrainian", () => {
+  it("writes no latin script in the delivery mode or the address source", () => {
     const modes = new Set<string>();
     const sources = new Set<string>();
 
@@ -915,7 +915,7 @@ describe("the clamp limits", () => {
     );
   });
 
-  it("clamps the preferred contact at 40", () => {
+  it("clamps the contact channel at 40", () => {
     expectClampedAt("💬 <b>Спосіб зв’язку:</b>", 40, (value) =>
       buildOrder({ customer: buildCustomer({ contact_channel: value }) })
     );

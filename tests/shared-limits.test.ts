@@ -11,6 +11,7 @@ import {
 const TELEGRAM_LIMIT = 4096;
 const BOUNDARY_CART_SIZE = 40;
 const BOUNDARY_NOTE = 282;
+const FREE_FORM_BOUNDARY_NOTE = 282;
 const BOUNDARY_ITEMS = 40;
 const OVER_BOUNDARY_ITEMS = 39;
 const WIDEST_NOTE = 600;
@@ -43,19 +44,36 @@ const boundaryCart = (): Record<string, unknown>[] =>
 const itemsIn = (message: string): number =>
   message.split(TITLE_LABEL).length - 1;
 
-const renderAtNote = (note: number): string =>
-  render(buildOrder({ comment: "x".repeat(note), cart: boundaryCart() }));
+const renderAtNote = (
+  note: number,
+  delivery?: Record<string, unknown>
+): string =>
+  render(
+    buildOrder({
+      ...(delivery === undefined ? {} : { delivery }),
+      comment: "x".repeat(note),
+      cart: boundaryCart(),
+    })
+  );
 
-const itemsAtNote = (note: number): number => itemsIn(renderAtNote(note));
+const itemsAtNote = (
+  note: number,
+  delivery?: Record<string, unknown>
+): number => itemsIn(renderAtNote(note, delivery));
 
-const widestNoteFittingWholeCart = (): number => {
+const widestNoteFittingWholeCart = (
+  delivery?: Record<string, unknown>
+): number => {
   let fits = 0;
   let drops = WIDEST_NOTE;
+
+  expect(itemsAtNote(fits, delivery)).toBe(BOUNDARY_ITEMS);
+  expect(itemsAtNote(drops, delivery)).toBeLessThan(BOUNDARY_ITEMS);
 
   while (fits + 1 < drops) {
     const middle = Math.floor((fits + drops) / 2);
 
-    if (itemsAtNote(middle) === BOUNDARY_ITEMS) {
+    if (itemsAtNote(middle, delivery) === BOUNDARY_ITEMS) {
       fits = middle;
     } else {
       drops = middle;
@@ -116,19 +134,16 @@ describe("the shared telegram budget", () => {
     expect(pastEdge).toMatch(/… <b>ще позицій: \+1<\/b>$/u);
   });
 
-  it("truncates a free-form address order and marks it the same way", () => {
-    const message = render(
-      buildOrder({
-        locale: "uk",
-        delivery: buildDeliveryGeneric(),
-        comment: "x".repeat(WIDEST_NOTE),
-        cart: boundaryCart(),
-      })
-    );
+  it("puts the free-form edge where its own note pins it, on both sides", () => {
+    const generic = buildDeliveryGeneric();
+    const atEdge = renderAtNote(FREE_FORM_BOUNDARY_NOTE, generic);
+    const pastEdge = renderAtNote(FREE_FORM_BOUNDARY_NOTE + 1, generic);
 
-    expect(message.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
-    expect(message).toMatch(/… <b>ще позицій: \+\d+<\/b>$/u);
-    expect(itemsIn(message)).toBeGreaterThan(0);
+    expect(widestNoteFittingWholeCart(generic)).toBe(FREE_FORM_BOUNDARY_NOTE);
+    expect(itemsIn(atEdge)).toBe(BOUNDARY_ITEMS);
+    expect(atEdge.length).toBeLessThanOrEqual(TELEGRAM_LIMIT);
+    expect(itemsIn(pastEdge)).toBe(OVER_BOUNDARY_ITEMS);
+    expect(pastEdge).toMatch(/… <b>ще позицій: \+1<\/b>$/u);
   });
 
   it("never grows the cart when the header grows", () => {
