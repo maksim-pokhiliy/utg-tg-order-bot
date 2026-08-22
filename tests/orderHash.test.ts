@@ -121,4 +121,8 @@ describe("order identity through the decoder", () => {
   it("decodes the pinned body onto the hash that produced every stored row", () => {
     expect(hashBody(buildPinnedBody())).toBe(PINNED_HASH);
   });
+
+  it("gives a currency case variant the identity of the canonical code", () => {
+    expect(hashBody(buildPinnedBody({ currency: "uah" }))).toBe(PINNED_HASH);
+  });
 });

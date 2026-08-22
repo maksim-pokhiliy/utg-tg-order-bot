@@ -1,9 +1,9 @@
 import { readDelivery, type OrderDelivery } from "./delivery.js";
 import {
-  isCurrencyCode,
   isPlainDecimal,
   isRecord,
   parseCart,
+  readCurrency,
   readText,
   type OrderCartItem,
   type PlainDecimal,
@@ -85,7 +85,7 @@ export const decodeEnvelopeBody = (
     return reject(delivery);
   }
 
-  const { locale, total, currency } = input;
+  const { locale, total } = input;
 
   if (typeof locale !== "string") {
     return reject("locale_not_string");
@@ -95,7 +95,10 @@ export const decodeEnvelopeBody = (
     return reject("total_not_plain_decimal");
   }
 
-  if (currency !== undefined && !isCurrencyCode(currency)) {
+  const currencyInput = input["currency"];
+  const currency = readCurrency(currencyInput);
+
+  if (currencyInput !== undefined && currency === undefined) {
     return reject("currency_malformed");
   }
 

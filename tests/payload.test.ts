@@ -855,9 +855,30 @@ describe("parseOrder shared payload rules", () => {
   });
 
   it("rejects a malformed currency code", () => {
-    for (const currency of ["UAHX", "ua", "uah", "U1H", "", 42]) {
+    for (const currency of ["UAHX", "ua", "U1H", "", 42]) {
       expectReject({ currency }, "currency_malformed");
     }
+  });
+
+  it("rejects a code that only reaches three letters by expanding", () => {
+    for (const currency of ["ßa", "ﬁx"]) {
+      expect(currency.toUpperCase()).toMatch(/^[A-Z]{3}$/);
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
+  it("rejects a code padded with whitespace rather than trimming it", () => {
+    for (const currency of [" UAH", "UAH ", "U H"]) {
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
+  it("accepts a currency in any case and hands on the canonical code", () => {
+    for (const currency of ["uah", "UaH", "UAH"]) {
+      expect(decode({ currency })?.currency).toBe("UAH");
+    }
+
+    expect(decode({ locale: "en", currency: "usd" })?.currency).toBe("USD");
   });
 
   it("accepts an absent currency so the locale map can take over", () => {
