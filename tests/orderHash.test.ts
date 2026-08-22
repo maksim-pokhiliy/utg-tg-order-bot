@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import { canonicalize, hashOrder } from "../src/orderHash.js";
+import { parseOrder } from "../src/payload.js";
 import {
   buildCartLine,
   buildEnvelope,
+  buildPinnedBody,
   PINNED_ENVELOPE,
   PINNED_HASH,
 } from "./support/envelope.js";
+
+const hashBody = (body: Record<string, unknown>): string => {
+  const result = parseOrder(body);
+
+  if (!result.ok) {
+    throw new Error(`pinned body rejected: ${result.reason}`);
+  }
+
+  return hashOrder(result.value);
+};
 
 describe("the canonical serialization", () => {
   it("orders object keys the same way whatever order they were written in", () => {
@@ -102,5 +114,11 @@ describe("the content hash", () => {
 
   it("treats an absent optional field and an explicitly undefined one as the same order", () => {
     expect(hashOrder(buildEnvelope({ comment: undefined }))).toBe(PINNED_HASH);
+  });
+});
+
+describe("order identity through the decoder", () => {
+  it("decodes the pinned body onto the hash that produced every stored row", () => {
+    expect(hashBody(buildPinnedBody())).toBe(PINNED_HASH);
   });
 });

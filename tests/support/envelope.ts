@@ -56,3 +56,34 @@ export const buildEnvelope = (
 });
 
 export const PINNED_ENVELOPE: OrderEnvelope = buildEnvelope();
+
+export const buildPinnedBody = (
+  overrides: Record<string, unknown> = {}
+): Record<string, unknown> => ({
+  version: 2,
+  idempotency_key: PINNED_KEY,
+  locale: "uk",
+  customer: {
+    first_name: "Марія",
+    last_name: "Шевченко",
+    phone: "+380671234567",
+  },
+  delivery: {
+    mode: "np_branch",
+    source: "np_directory",
+    city: "м. Львів, Львівська обл.",
+    warehouse: "Відділення №1: вул. Городоцька, 359",
+    warehouse_number: "1",
+  },
+  total: "250.00",
+  currency: "UAH",
+  cart: [
+    {
+      title: "Шеврон «Очікування»",
+      quantity: 2,
+      productUrl:
+        "https://www.ua-tactical-gear.com/uk/category/patches/waiting",
+    },
+  ],
+  ...overrides,
+});
