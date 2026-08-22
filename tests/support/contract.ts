@@ -44,3 +44,9 @@ export const ORDER_DELIVERY_GENERIC_KEYS = [
 ] as const;
 
 export const CART_ITEM_KEYS = ["title", "quantity", "productUrl"] as const;
+
+export const ORDER_CONTACT_CHANNEL_VALUES = [
+  "call",
+  "telegram",
+  "viber",
+] as const;

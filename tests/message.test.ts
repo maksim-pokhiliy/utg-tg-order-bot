@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { renderOrder } from "../src/message.js";
 import { parseOrder, type OrderEnvelope } from "../src/payload.js";
+import { ORDER_CONTACT_CHANNEL_VALUES } from "./support/contract.js";
 import {
   buildCartItem,
   buildCustomer,
@@ -448,11 +449,11 @@ const SOURCE_TEXT_COUNT = 4;
 const LABEL_DELIVERY = "🚚 <b>Доставка:</b>";
 const LABEL_CONTACT = "💬 <b>Спосіб зв’язку:</b>";
 
-const CONTACT_CHANNEL_TEXTS: readonly (readonly [string, string])[] = [
+const CONTACT_CHANNEL_LABELS: ReadonlyMap<string, string> = new Map([
   ["call", "Дзвінок"],
   ["telegram", "Telegram"],
   ["viber", "Viber"],
-];
+]);
 
 const SOURCE_SPREAD = [
   buildDeliveryBranch({ source: "np_directory" }),
@@ -521,13 +522,21 @@ describe("the script the labels are written in", () => {
 });
 
 describe("the contact channel the operator reads", () => {
+  it("fails when the vocabulary and the pinned labels drift apart", () => {
+    expect([...CONTACT_CHANNEL_LABELS.keys()].sort()).toEqual(
+      [...ORDER_CONTACT_CHANNEL_VALUES].sort()
+    );
+  });
+
   it("names every channel the shop can send", () => {
-    for (const [value, text] of CONTACT_CHANNEL_TEXTS) {
+    for (const value of ORDER_CONTACT_CHANNEL_VALUES) {
       const message = render(
         buildOrder({ customer: buildCustomer({ contact_channel: value }) })
       );
 
-      expect(lineValue(message, LABEL_CONTACT)).toBe(text);
+      expect(lineValue(message, LABEL_CONTACT)).toBe(
+        CONTACT_CHANNEL_LABELS.get(value)
+      );
     }
   });
 
@@ -836,6 +845,13 @@ describe("the money figure", () => {
 
     expect(message).toContain(`${LABEL_TOTAL} ₴250.00`);
     expect(message).not.toContain("$");
+  });
+
+  it("hands the operator a money line for a miscased currency, not a lost order", () => {
+    const miscased = render(buildOrder({ currency: "uah" }));
+
+    expect(miscased).toContain(`${LABEL_TOTAL} 250,00\u00A0₴`);
+    expect(miscased).toBe(render(buildOrder({ currency: "UAH" })));
   });
 });
 

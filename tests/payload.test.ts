@@ -69,13 +69,47 @@ const decode = (
   overrides: Record<string, unknown> = {}
 ): OrderPayload | undefined => payloadOf(parseOrder(buildOrder(overrides)));
 
-const expectRejectedBody = (body: unknown, reason: RejectReason): void => {
+const MAX_SHOWN_CODE_POINTS = 8;
+
+const showCodePoints = (points: readonly string[]): string =>
+  points
+    .map(
+      (point) =>
+        `U+${(point.codePointAt(0) ?? 0)
+          .toString(16)
+          .toUpperCase()
+          .padStart(4, "0")}`
+    )
+    .join(" ");
+
+const renderFixtureValue = (value: unknown): string => {
+  if (typeof value !== "string") {
+    return String(JSON.stringify(value));
+  }
+
+  const points = [...value];
+
+  return points.length > MAX_SHOWN_CODE_POINTS
+    ? JSON.stringify(value)
+    : `${JSON.stringify(value)} (${showCodePoints(points)})`;
+};
+
+const describeOverrides = (overrides: Record<string, unknown>): string =>
+  Object.entries(overrides)
+    .map(([key, value]) => `${key}=${renderFixtureValue(value)}`)
+    .join(", ");
+
+const expectRejectedBody = (
+  body: unknown,
+  reason: RejectReason,
+  label = "the body"
+): void => {
   const result = parseOrder(body);
 
-  expect(result.ok).toBe(false);
+  expect(result.ok, `expected ${label} to be rejected`).toBe(false);
 
   if (!result.ok) {
-    expect(result.reason).toBe(reason);
+    expect(result.reason, `wrong reject reason for ${label}`).toBe(reason);
   }
 };
 
@@ -83,7 +117,11 @@ const expectReject = (
   overrides: Record<string, unknown>,
   reason: RejectReason
 ): void => {
-  expectRejectedBody(buildOrder(overrides), reason);
+  expectRejectedBody(
+    buildOrder(overrides),
+    reason,
+    describeOverrides(overrides)
+  );
 };
 
 describe("parseOrder version gate", () => {
@@ -855,9 +893,42 @@ describe("parseOrder shared payload rules", () => {
   });
 
   it("rejects a malformed currency code", () => {
-    for (const currency of ["UAHX", "ua", "uah", "U1H", "", 42]) {
+    for (const currency of ["UAHX", "ua", "U1H", "", 42, null]) {
       expectReject({ currency }, "currency_malformed");
     }
+  });
+
+  it("rejects a code that only becomes three ASCII letters once upper-cased", () => {
+    for (const currency of ["ßa", "ﬁx", "ﬃ", "ıab", "ſſſ"]) {
+      expect(currency.toUpperCase()).toMatch(/^[A-Z]{3}$/);
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
+  it("rejects the punctuation that brackets the letter runs", () => {
+    for (const currency of ["[\\]", "^_`", "@AB", "{|}"]) {
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
+  it("rejects anything after the third letter, a newline included", () => {
+    for (const currency of ["UAH\n", "UAH\r\n", "UAH\nEVIL"]) {
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
+  it("rejects a code carrying whitespace rather than trimming it away", () => {
+    for (const currency of [" UAH", "UAH ", "U H"]) {
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
+  it("accepts a currency in any case and hands on the canonical code", () => {
+    for (const currency of ["uah", "UaH", "UAH"]) {
+      expect(decode({ currency })?.currency).toBe("UAH");
+    }
+
+    expect(decode({ currency: "usd" })?.currency).toBe("USD");
   });
 
   it("accepts an absent currency so the locale map can take over", () => {

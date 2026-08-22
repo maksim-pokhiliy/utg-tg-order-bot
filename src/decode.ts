@@ -1,5 +1,5 @@
 const TOTAL_PATTERN = /^\d+(\.\d+)?$/;
-const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+const CURRENCY_PATTERN = /^[A-Za-z]{3}$/;
 const MAX_TOTAL_LENGTH = 20;
 const MAX_QUANTITY = 100_000;
 
@@ -34,8 +34,23 @@ export interface OrderCartItem {
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-export const isCurrencyCode = (value: unknown): value is string =>
-  typeof value === "string" && CURRENCY_PATTERN.test(value);
+type CurrencyRead =
+  { isValid: true; code: string | undefined } | { isValid: false };
+
+export const readCurrency = (
+  source: Record<string, unknown>,
+  key: string
+): CurrencyRead => {
+  const value = source[key];
+
+  if (value === undefined) {
+    return { isValid: true, code: undefined };
+  }
+
+  return typeof value === "string" && CURRENCY_PATTERN.test(value)
+    ? { isValid: true, code: value.toUpperCase() }
+    : { isValid: false };
+};
 
 export const isPlainDecimal = (value: unknown): value is PlainDecimal =>
   typeof value === "string" &&
