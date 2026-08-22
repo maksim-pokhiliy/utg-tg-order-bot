@@ -28,6 +28,7 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
 | BD-9 | Unknown `locale` degrades to uk style, not 400 | RATIFIED |
 | BD-10 | B5 talks to Neon over SQL-over-HTTP via plain `fetch` | RATIFIED |
 | BD-11 | Dedupe suppresses only confirmed-delivered twins | RATIFIED |
+| BD-12 | Case is not information: currency folds case at the read, garbage still fails closed | RATIFIED |
 
 ---
 
@@ -180,3 +181,26 @@ single-run mixed-scope PR shape are the owner's own calls from the same exchange
   analysis). Hence every condition errs toward sending: short window, key must
   corroborate, unconfirmed delivery never suppresses, and the store being down makes
   the relay behave as if dedupe did not exist.
+
+### BD-12 — Case is not information: the currency read folds case at the boundary and still fails closed on garbage
+
+- **Status:** RATIFIED (planner ruling, 2026-08-22, polish-tail P1 / PR #7 `aa10f56`).
+- **Decision.** `parseOrder` accepts a `currency` whose RAW value is three ASCII letters
+  in any case and normalizes it to uppercase at the read (`readCurrency`: shape test on
+  the raw value FIRST, then `toUpperCase` — the order is load-bearing, because
+  `toUpperCase` does not preserve length: `"ßa"` → `"SSA"`, `"ﬁx"` → `"FIX"`). Every
+  other shape still rejects `currency_malformed` (400). Only `toUpperCase`, never
+  `toLocaleUpperCase` — and the property test pins the dangerous explicit-tag form.
+- **Rationale.** Refines BD-9's fail-closed line for integrity-risk fields. A wrong
+  DENOMINATION mislabels money to the operator and must fail closed; a wrong CASE
+  provably cannot change the denomination, and rejecting it makes an informational
+  field cost a volunteer's order — the exact failure §5's philosophy forbids. Order
+  identity proven unmoved three ways: the decoded pinned body still hashes to the
+  frozen store canon (`PINNED_HASH`), all 17 576 previously-accepted codes are
+  `toUpperCase` fixed points, and a 25M-body differential (independent reviewer)
+  showed zero hash/message/verdict drift beyond the intended case-only accepts.
+  Consequence, deliberately accepted and owner-visible in the PR body: a case-variant
+  body and its canonical twin are now ONE order for dedupe — only bodies that
+  previously answered 400 and were never stored can merge.
+- **Links.** PR #7; shop `initiatives/polish-tail/` (P1); the canonical ledger's
+  UAC-26 row; BDEF-13 (the same class left OPEN on `delivery.mode`, where it is fatal).

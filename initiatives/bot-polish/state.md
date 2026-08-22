@@ -1,7 +1,9 @@
 # bot-polish — state (the board)
 
-**Updated:** 2026-08-21 (U8 merged — the operators read Ukrainian. This board stays COMPLETE;
-what remains here is planner ops, and the shop's initiative is ready to close)
+**Updated:** 2026-08-22 (P1 merged — the third hosted pair: the vocabulary is pinned at value
+level and a miscased currency no longer costs an order. This board stays COMPLETE; what
+remains here is planner ops — BDEF-8/10/11 — plus the new BDEF-13/14 pair for any next
+relay round)
 
 A scannable board, not prose. Narrative → `journal.md`; why → `decisions.md`;
 carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-loads it).
@@ -18,10 +20,16 @@ carry-forwards → `deferred.md`. **Resume here** (the SessionStart hook force-l
 
 ## Next action
 
-**This board is COMPLETE and has now hosted both paired steps it was held open for.** B1–B5
-shipped; **U6** merged 2026-08-20 (v1 deleted); **U8** merged 2026-08-21 as `da2f9d6` (PR #6) —
-the order message now speaks Ukrainian to the operators, which was an owner ruling from the U7
-browser gate, not an engineering preference.
+**This board is COMPLETE and has now hosted three paired steps.** B1–B5 shipped; **U6** merged
+2026-08-20 (v1 deleted); **U8** merged 2026-08-21 as `da2f9d6` (PR #6) — the order message now
+speaks Ukrainian to the operators, which was an owner ruling from the U7 browser gate, not an
+engineering preference; **P1** (driven by the shop's `polish-tail`) merged 2026-08-22 as
+`aa10f56` (PR #7) — `contract.ts` pins the channel VALUES (`call | telegram | viber`) and the
+display map is pinned through the rendered message, so a rename on either side now reddens that
+side; and the currency read folds case at the boundary (BD-12) so a miscased informational field
+no longer costs a volunteer's order. Order identity proven unmoved (frozen `PINNED_HASH`,
+17 576 fixed points, a 25M-body differential). New carry-forwards: BDEF-13 (the same class is
+FATAL on `delivery.mode`), BDEF-14 (absorbed shop bugs leave no artifact), BDEF-15 (hygiene).
 
 What U8 changed here: 21 labels plus the delivery-mode names, the address-source guidance, the
 contact channel (`call → Дзвінок`, `telegram → Telegram`, `viber → Viber`, anything else printed

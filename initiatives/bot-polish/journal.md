@@ -529,3 +529,28 @@ Append-only. One entry per session/step.
   untrustworthy and the planner re-verified the sharpest claim by hand.
 - **Left open here, and it is the one worth scheduling:** the channel vocabulary is a value-level
   cross-repo coupling nothing executable pins. Carried in the shop's ledger as UAC-27.
+
+## 2026-08-22 — P1 (the shop's polish-tail): values pinned, case folded — the third hosted pair
+
+- PR #7 `aa10f56` merged as a pair with shop PR #26 `e48442a`, ten seconds apart;
+  prod-smoked (the new deploy 401s a secretless caller). The previous entry's "left
+  open here" line is answered: `contract.ts` exports `ORDER_CONTACT_CHANNEL_VALUES`,
+  the display map is pinned THROUGH the rendered message, and the decoder gained NO
+  enum — B3-Q1 stands, unknown values still render verbatim.
+- **BD-12 ratified: case is not information.** Any-case 3-letter currency normalizes
+  to uppercase at the read (raw shape first — `toUpperCase` does not preserve length);
+  garbage still 400s. Order identity proven unmoved: the decoded pinned body sits on
+  the frozen `PINNED_HASH`, all 17 576 previously-accepted codes are fixed points, and
+  the independent reviewer's 25M-body differential showed zero unintended drift.
+- **The deep review earned its keep twice**: moving `"uah"` to accept had deleted the
+  only pattern-typo detector (`[A-z]` passed everything) — restored as a property test
+  over the full accepted domain (decoder-accept ⇒ Intl formats) plus boundary
+  literals; and the hand-written `CurrencyRead` had lost the compiler's null-narrowing
+  master enforced — pinned by fixture, both directions proven. A micro-round pinned
+  the `/m` anchor (`"UAH\nEVIL"`) and re-measured the whole mutation table as one
+  epoch.
+- New carry-forwards: **BDEF-13** (`delivery.mode` is the same rejection class and
+  there it is FATAL — needs its own ruling, mode is shape-determining), **BDEF-14**
+  (an absorbed shop bug leaves no artifact, not even retroactively — `orders.payload`
+  stores the DECODED envelope), **BDEF-15** (hygiene, incl. the three-decimal-currency
+  render trap measured at exactly 8 codes).
