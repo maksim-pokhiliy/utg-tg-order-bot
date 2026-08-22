@@ -911,6 +911,12 @@ describe("parseOrder shared payload rules", () => {
     }
   });
 
+  it("rejects anything after the third letter, a newline included", () => {
+    for (const currency of ["UAH\n", "UAH\r\n", "UAH\nEVIL"]) {
+      expectReject({ currency }, "currency_malformed");
+    }
+  });
+
   it("rejects a code carrying whitespace rather than trimming it away", () => {
     for (const currency of [" UAH", "UAH ", "U H"]) {
       expectReject({ currency }, "currency_malformed");
