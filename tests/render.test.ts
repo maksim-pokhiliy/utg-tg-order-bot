@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { OrderCartItem } from "../src/decode.js";
+import { readCurrency, type OrderCartItem } from "../src/decode.js";
 import {
   clampEscaped,
   composeMessage,
@@ -9,6 +9,37 @@ import {
 } from "../src/render.js";
 
 const NBSP = " ";
+
+const PROBE_FIRST_CODE_UNIT = 0x40;
+const PROBE_LAST_CODE_UNIT = 0x7d;
+const CANONICAL_CURRENCY_CODES = 26 ** 3;
+
+const PROBE_ALPHABET: readonly string[] = Array.from(
+  { length: PROBE_LAST_CODE_UNIT - PROBE_FIRST_CODE_UNIT + 1 },
+  (_unused, index) => String.fromCharCode(PROBE_FIRST_CODE_UNIT + index)
+);
+
+const collectAccepted = (accepted: Set<string>, prefix: string): void => {
+  for (const last of PROBE_ALPHABET) {
+    const read = readCurrency({ currency: `${prefix}${last}` }, "currency");
+
+    if (read.isValid && read.code !== undefined) {
+      accepted.add(read.code);
+    }
+  }
+};
+
+const acceptedCurrencyCodes = (): ReadonlySet<string> => {
+  const accepted = new Set<string>();
+
+  for (const first of PROBE_ALPHABET) {
+    for (const second of PROBE_ALPHABET) {
+      collectAccepted(accepted, `${first}${second}`);
+    }
+  }
+
+  return accepted;
+};
 
 describe("formatTotal", () => {
   it("renders a uk UAH total with the hryvnia sign and nbsp separators", () => {
@@ -49,6 +80,30 @@ describe("formatTotal", () => {
       expect(() => formatTotal("46200.00", locale, undefined)).not.toThrow();
       expect(formatTotal("46200.00", locale, undefined)).toContain("₴");
     }
+  });
+});
+
+describe("the codes the decoder can hand to the money line", () => {
+  it("accepts nothing the three-letter alphabet does not spell", () => {
+    const accepted = acceptedCurrencyCodes();
+    const stray = [...accepted].filter((code) => !/^[A-Z]{3}$/.test(code));
+
+    expect(stray).toEqual([]);
+    expect(accepted.size).toBe(CANONICAL_CURRENCY_CODES);
+  });
+
+  it("formats every code it accepts, so the money line cannot throw", () => {
+    const throwing: string[] = [];
+
+    for (const code of acceptedCurrencyCodes()) {
+      try {
+        formatTotal("250.00", "uk", code);
+      } catch {
+        throwing.push(code);
+      }
+    }
+
+    expect(throwing).toEqual([]);
   });
 });
 
