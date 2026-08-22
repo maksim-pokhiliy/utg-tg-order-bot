@@ -269,6 +269,19 @@ describe("POST /api/place_order with a full envelope", () => {
     expect(sent.text).not.toContain("$");
   });
 
+  it("relays an order whose currency is miscased instead of refusing it", async () => {
+    const fetchStub = stubTelegram();
+
+    const response = await POST(
+      new StubRequest(buildOrder({ currency: "uah" }))
+    );
+
+    expect(response.status).toBe(200);
+    expect(readSentMessage(fetchStub).text).toContain(
+      "💲 <b>Сума:</b> 250,00\u00A0₴"
+    );
+  });
+
   it("rejects a malformed body and names the real problem", async () => {
     const logs = captureConsoleWarn();
     const fetchStub = stubTelegram();

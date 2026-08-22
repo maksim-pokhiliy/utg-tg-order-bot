@@ -867,7 +867,7 @@ describe("parseOrder shared payload rules", () => {
     }
   });
 
-  it("rejects a code padded with whitespace rather than trimming it", () => {
+  it("rejects a code carrying whitespace rather than trimming it away", () => {
     for (const currency of [" UAH", "UAH ", "U H"]) {
       expectReject({ currency }, "currency_malformed");
     }
@@ -878,7 +878,7 @@ describe("parseOrder shared payload rules", () => {
       expect(decode({ currency })?.currency).toBe("UAH");
     }
 
-    expect(decode({ locale: "en", currency: "usd" })?.currency).toBe("USD");
+    expect(decode({ currency: "usd" })?.currency).toBe("USD");
   });
 
   it("accepts an absent currency so the locale map can take over", () => {

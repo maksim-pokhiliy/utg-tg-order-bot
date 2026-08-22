@@ -95,10 +95,9 @@ export const decodeEnvelopeBody = (
     return reject("total_not_plain_decimal");
   }
 
-  const currencyInput = input["currency"];
-  const currency = readCurrency(currencyInput);
+  const currency = readCurrency(input, "currency");
 
-  if (currencyInput !== undefined && currency === undefined) {
+  if (!currency.isValid) {
     return reject("currency_malformed");
   }
 
@@ -119,7 +118,7 @@ export const decodeEnvelopeBody = (
         idempotency_key: readText(input, "idempotency_key"),
         locale,
         total,
-        currency,
+        currency: currency.code,
         cart,
       },
     },

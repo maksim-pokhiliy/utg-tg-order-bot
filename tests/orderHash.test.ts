@@ -118,7 +118,7 @@ describe("the content hash", () => {
 });
 
 describe("order identity through the decoder", () => {
-  it("decodes the pinned body onto the hash that produced every stored row", () => {
+  it("decodes the pinned body onto the frozen canon every stored row was hashed by", () => {
     expect(hashBody(buildPinnedBody())).toBe(PINNED_HASH);
   });
 

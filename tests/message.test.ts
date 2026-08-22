@@ -522,7 +522,7 @@ describe("the script the labels are written in", () => {
 });
 
 describe("the contact channel the operator reads", () => {
-  it("labels exactly the vocabulary the shop can send", () => {
+  it("fails when the vocabulary and the pinned labels drift apart", () => {
     expect([...CONTACT_CHANNEL_LABELS.keys()].sort()).toEqual(
       [...ORDER_CONTACT_CHANNEL_VALUES].sort()
     );
@@ -845,6 +845,13 @@ describe("the money figure", () => {
 
     expect(message).toContain(`${LABEL_TOTAL} ₴250.00`);
     expect(message).not.toContain("$");
+  });
+
+  it("hands the operator a money line for a miscased currency, not a lost order", () => {
+    const miscased = render(buildOrder({ currency: "uah" }));
+
+    expect(miscased).toContain(`${LABEL_TOTAL} 250,00\u00A0₴`);
+    expect(miscased).toBe(render(buildOrder({ currency: "UAH" })));
   });
 });
 

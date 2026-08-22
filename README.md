@@ -38,22 +38,24 @@ Ukrainian delivery does not fit a flat address string, so the envelope nests the
 }
 ```
 
-| Key                 | Type     | Required | Notes                                                                                                  |
-| ------------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------ |
-| `version`           | `number` | yes      | must be exactly `2`                                                                                    |
-| `locale`            | `string` | yes      | `uk`/`en` are honoured; any other tag formats with the `uk` number style                               |
-| `total`             | `string` | yes      | plain decimal already at display magnitude, e.g. `"250.00"` — no sign, no exponent, no whitespace      |
-| `currency`          | `string` | no       | ISO-4217-shaped (`UAH`, `USD`). **Authoritative for the money figure.** Absent → derived from `locale` |
-| `cart`              | `array`  | yes      | at least one item                                                                                      |
-| `cart[].title`      | `string` | yes      | non-empty; carries the size suffix when the product has one                                            |
-| `cart[].quantity`   | `number` | yes      | positive integer                                                                                       |
-| `cart[].productUrl` | `string` | yes      |                                                                                                        |
-| `comment`           | `string` | no       | free-form note; omitted when blank                                                                     |
-| `idempotency_key`   | `string` | no       | corroborates the dedupe check; never rendered                                                          |
+| Key                 | Type     | Required | Notes                                                                                                                                                 |
+| ------------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `version`           | `number` | yes      | must be exactly `2`                                                                                                                                   |
+| `locale`            | `string` | yes      | `uk`/`en` are honoured; any other tag formats with the `uk` number style                                                                              |
+| `total`             | `string` | yes      | plain decimal already at display magnitude, e.g. `"250.00"` — no sign, no exponent, no whitespace                                                     |
+| `currency`          | `string` | no       | three ASCII letters, any case (`UAH`, `uah`); stored and rendered upper-cased. **Authoritative for the money figure.** Absent → derived from `locale` |
+| `cart`              | `array`  | yes      | at least one item                                                                                                                                     |
+| `cart[].title`      | `string` | yes      | non-empty; carries the size suffix when the product has one                                                                                           |
+| `cart[].quantity`   | `number` | yes      | positive integer                                                                                                                                      |
+| `cart[].productUrl` | `string` | yes      |                                                                                                                                                       |
+| `comment`           | `string` | no       | free-form note; omitted when blank                                                                                                                    |
+| `idempotency_key`   | `string` | no       | corroborates the dedupe check; never rendered                                                                                                         |
 
 Other `cart[]` keys the shop sends (`id`, `price`, `image`) are accepted and ignored. A test pins the exact set of keys the relay reads, so adding a dependency on a new key fails the build.
 
 `currency` is authoritative on purpose: when the exchange-rate feed is down the shop quotes hryvnia to both locales and sends `currency: "UAH"` under `locale: "en"`. Deriving the currency from the locale would show the operator a dollar figure on a hryvnia amount.
+
+Its case, though, is not information. `uah` and `UAH` name the same denomination, so the relay accepts either and canonicalises to upper case before the value reaches the message, the stored row and the content hash — a shop-side casing slip costs nobody an order, and two case variants of one order stay one order for the dedupe check. Everything that is not three ASCII letters still fails closed with `currency_malformed`, because a code the relay cannot read is a code that could mislabel a money figure in front of a volunteer. The shape is matched before the upper-casing, not after: `toUpperCase()` can lengthen a string — U+00DF and the U+FB01 ligature each expand into two ASCII letters — so testing the normalized form would let a two-character value in as a currency.
 
 The relay rejects an empty `cart`, while the shop's payload composer will happily build one. That asymmetry is deliberate and unreachable in practice — checkout gates the form on a non-empty cart — and the relay stays the stricter side, because a zero-line order in front of an operator is the worse failure.
 
