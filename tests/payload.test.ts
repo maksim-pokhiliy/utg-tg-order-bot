@@ -861,7 +861,7 @@ describe("parseOrder shared payload rules", () => {
   });
 
   it("rejects a code that only reaches three letters by expanding", () => {
-    for (const currency of ["ßa", "ﬁx"]) {
+    for (const currency of ["ßa", "ﬁx", "ﬃ"]) {
       expect(currency.toUpperCase()).toMatch(/^[A-Z]{3}$/);
       expectReject({ currency }, "currency_malformed");
     }

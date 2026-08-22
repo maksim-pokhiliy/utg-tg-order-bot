@@ -230,7 +230,7 @@ describe("the pinned key sets", () => {
 });
 
 describe("the pinned contact channel vocabulary", () => {
-  it("pins the vocabulary against accidental drift", () => {
+  it("pins the vocabulary size against accidental growth", () => {
     expect(ORDER_CONTACT_CHANNEL_VALUES).toHaveLength(3);
   });
 });
