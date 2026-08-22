@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../api/place_order.js";
 import {
   CART_ITEM_KEYS,
+  ORDER_CONTACT_CHANNEL_VALUES,
   ORDER_CUSTOMER_KEYS,
   ORDER_DELIVERY_BRANCH_KEYS,
   ORDER_DELIVERY_COURIER_KEYS,
@@ -225,5 +226,11 @@ describe("the pinned key sets", () => {
     expect(ORDER_DELIVERY_COURIER_KEYS).toHaveLength(6);
     expect(ORDER_DELIVERY_GENERIC_KEYS).toHaveLength(5);
     expect(CART_ITEM_KEYS).toHaveLength(3);
+  });
+});
+
+describe("the pinned contact channel vocabulary", () => {
+  it("pins the vocabulary against accidental drift", () => {
+    expect(ORDER_CONTACT_CHANNEL_VALUES).toHaveLength(3);
   });
 });
