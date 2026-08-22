@@ -34,7 +34,7 @@ export interface OrderCartItem {
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-export type CurrencyRead =
+type CurrencyRead =
   { isValid: true; code: string | undefined } | { isValid: false };
 
 export const readCurrency = (
